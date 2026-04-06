@@ -1,0 +1,150 @@
+---
+- hosts: all
+  strategy: linear
+  serial: '{{ cfg.serial | default(1) }}'
+  become: yes
+  gather_facts: no
+  any_errors_fatal: yes
+  vars:
+    vcl:
+      # By default, the playbook deploys files in a 'vcl' folder located in the
+      # same directory as the playbook itself.
+      source: '{{ cfg.source | default(playbook_dir ~ "/vcl") }}'
+
+      # Using a VCL staging area allows Ansible to be used for VCL deployment
+      # while adhering to configuration management best practices (e.g.,
+      # idempotent executions).
+      staging: /var/lib/varnish/.staging
+
+      # Using 'rsync' to transfer files to the VCL staging area is ideal, but it
+      # may not always be possible, for example, when passwordless sudo is not
+      # available.
+      rsync: '{{ cfg.rsync | default(true) }}'
+
+      # Running 'varnishd -C' to check the VCL syntax adds a small delay, but it
+      # is the most reliable method.
+      check: '{{ cfg.check | default(true) }}'
+
+      # Using '/etc/varnish/vcl' as the VCL deployment root is not the usual
+      # practice, but it is very convenient (e.g., rsync can be used to purge
+      # old files, it provides nice diffs, etc.). Note that this requires
+      # adjusting the 'vcl_path' parameter in Varnish.
+      destination: /etc/varnish/vcl
+
+      diff: '{{ cfg.diff | default(true) }}'
+
+      prompt: '{{ cfg.prompt | default(true) }}'
+
+  tasks:
+    - name: Destroy the VCL staging area
+      when: not vcl.rsync
+      ansible.builtin.file:
+        path: '{{ vcl.staging }}'
+        state: absent
+
+    - name: Create the VCL staging area
+      ansible.builtin.file:
+        path: '{{ vcl.staging }}'
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Synchronize files in the VCL staging area
+      when: vcl.rsync
+      ansible.posix.synchronize:
+        src: '{{ vcl.source }}/'
+        dest: '{{ vcl.staging }}'
+        archive: no
+        checksum: yes
+        recursive: yes
+        delete: yes
+        rsync_opts:
+          - '--exclude=environment.vcl'
+
+    - name: Copy files to the VCL staging area
+      when: not vcl.rsync
+      ansible.builtin.copy:
+        src: '{{ vcl.source }}/'
+        dest: '{{ vcl.staging }}'
+        owner: root
+        group: root
+
+    # Example of how to create a dynamic 'environment.vcl' file using context
+    # from the Ansible inventory and including environment-specific VCL files
+    # based on that context. The fewer dynamically generated files, the better,
+    # but this approach is useful to unify configuration across environments.
+    - name: Create dynamic 'environment.vcl'
+      ansible.builtin.copy:
+        dest: '{{ vcl.staging }}/environment.vcl'
+        owner: root
+        group: root
+        content: |
+          # Automatically generated on {{ '%Y-%m-%dT%H:%M:%SZ' | strftime }}. DO **NOT** EDIT!
+
+          sub vcl_init {
+              new environment = kvstore.init();
+              environment.set("id", "{{ env }}");
+              environment.set("dc", "{{ dc }}");
+              environment.set("az", "{{ az }}");
+          }
+
+          include "environment.{{ env }}.{{ dc }}.vcl";
+
+    - name: Check syntax of files in the VCL staging area
+      when: vcl.check
+      changed_when: no
+      ansible.builtin.shell: |
+        OUTPUT=$(mktemp)
+        trap "rm -f $OUTPUT" EXIT
+
+        varnishd \
+          -C \
+          -f '{{ vcl.staging }}/main.vcl' \
+          -p 'vcl_path={{ vcl.staging }}:/usr/share/varnish-plus/vcl' \
+          >"$OUTPUT" 2>&1
+        if [ $? -ne 0 ]; then
+          cat "$OUTPUT"
+          exit 1
+        fi
+
+    - name: Compare files in the VCL staging area and files in '{{ vcl.destination }}'
+      when: vcl.diff
+      register: vcl_diff
+      changed_when: vcl_diff.rc == 1
+      failed_when: vcl_diff.rc >= 2
+      ansible.builtin.command: |
+        diff -U 5 -r '{{ vcl.destination }}' '{{ vcl.staging }}'
+
+    - name: Ask for confirmation to proceed with the deployment
+      when: vcl.prompt
+      register: vcl_pause
+      ansible.builtin.pause:
+        prompt: Do you want to continue with those changes in {{ ansible_play_batch | join(', ') }}? (yes|no)...
+      # The 'ansible.builtin.pause' module is, by definition, executed only on
+      # one host, so the registered variable will only be available on that host.
+      # To work around this, we use an explicit 'run_once: true' to make Ansible
+      # aware of this behavior, allowing it to propagate the variable to all
+      # hosts in the current batch.
+      run_once: true
+
+    - name: Synchronize files in '{{ vcl.destination }}'
+      when: not vcl.prompt or (vcl_pause is defined and vcl_pause.user_input | bool)
+      delegate_to: '{{ inventory_hostname }}'
+      notify:
+        - Reload Varnish
+      ansible.posix.synchronize:
+        src: '{{ vcl.staging }}/'
+        dest: '{{ vcl.destination }}'
+        archive: no
+        checksum: yes
+        recursive: yes
+        delete: yes
+        rsync_opts:
+          - '--links'
+
+  handlers:
+    - name: Reload Varnish
+      ansible.builtin.service:
+        name: varnish
+        state: reloaded

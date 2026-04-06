@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  vcl-syntax-check:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Varnish Enterprise repository
+        run: |
+          curl -s https://packagecloud.io/install/repositories/varnishplus/60-enterprise/script.deb.sh | sudo bash
+
+      - name: Install Varnish Enterprise packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=non-empty-value apt-get install -y \
+            varnish-plus \
+            varnish-plus-ha \
+            varnish-plus-vmods-extra
+
+      - name: Uncomment 'akamai.vcl'
+        working-directory: vcl
+        run: sed -i 's/^# \(include "akamai.vcl";\)/\1/' main.vcl
+
+      - name: Check VCL syntax
+        working-directory: vcl
+        run: |
+          for REPLICATION in disabled vha cluster; do
+            cp main.vcl main.vcl.bak
+
+            sed -i 's/^\(include "replication-.*\.vcl"\);/# \1;/' main.vcl
+            sed -i "s/^# \(include \"replication-$REPLICATION.vcl\";\)/\1/" main.vcl
+            varnishd \
+              -C \
+              -f "$PWD/main.vcl" \
+              -p "vcl_path=$PWD:/usr/share/varnish-plus/vcl"
+
+            mv main.vcl.bak main.vcl
+          done
