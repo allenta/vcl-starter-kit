@@ -737,9 +737,9 @@ sub recv_handle_invalidation {
     } elsif (req.http.X-Forced-Miss) {
         set req.hash_always_miss = true;
 
-    # Other unsupported methods.
+    # Other unsupported invalidation requests.
     } else {
-        return (synth(405, "Method not allowed"));
+        return (synth(400, "Bad invalidation request"));
     }
 }
 
