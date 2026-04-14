@@ -701,7 +701,7 @@ sub hit_miss_refresh_purged_object {
 sub recv_handle_invalidation {
     # Is this an unauthorized invalidation request?
     if (config.get(req.http.X-Varnish-Route + ":invalidation-secret") != "" &&
-        (std.time2integer(now, 0) - std.integer(req.http.X-Timestamp, 0) < 300 ||
+        (std.time2integer(now, 0) - std.integer(req.http.X-Timestamp, 0) > 300 ||
          digest.hmac_sha256(
              config.get(req.http.X-Varnish-Route + ":invalidation-secret"),
              req.http.Host + req.url + req.http.X-Timestamp) != req.http.X-Signature)) {
