@@ -1021,11 +1021,11 @@ sub vcl_backend_response {
     # backend responses won't reach this logic.
     if (beresp.status >= 200 && beresp.status < 300) {
         counters.counter("beresp-2xx", 1, varnishstat=true);
-    } elseif (beresp.status >= 300 && beresp.status < 400) {
+    } elsif (beresp.status >= 300 && beresp.status < 400) {
         counters.counter("beresp-3xx", 1, varnishstat=true);
-    } elseif (beresp.status >= 400 && beresp.status < 500) {
+    } elsif (beresp.status >= 400 && beresp.status < 500) {
         counters.counter("beresp-4xx", 1, varnishstat=true);
-    } elseif (beresp.status >= 500 && beresp.status < 600) {
+    } elsif (beresp.status >= 500 && beresp.status < 600) {
         counters.counter("beresp-5xx", 1, varnishstat=true);
     }
 

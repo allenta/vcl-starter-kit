@@ -25,11 +25,11 @@ sub deliver_client_response {
     # self-routed cluster requests can and we're intentionally counting them.
     if (resp.status >= 200 && resp.status < 300) {
         counters.counter("resp-2xx", 1, varnishstat=true);
-    } elseif (resp.status >= 300 && resp.status < 400) {
+    } elsif (resp.status >= 300 && resp.status < 400) {
         counters.counter("resp-3xx", 1, varnishstat=true);
-    } elseif (resp.status >= 400 && resp.status < 500) {
+    } elsif (resp.status >= 400 && resp.status < 500) {
         counters.counter("resp-4xx", 1, varnishstat=true);
-    } elseif (resp.status >= 500 && resp.status < 600) {
+    } elsif (resp.status >= 500 && resp.status < 600) {
         counters.counter("resp-5xx", 1, varnishstat=true);
     }
 
@@ -72,11 +72,11 @@ sub save_backend_request {
         # post-route logic won't be reached by revived objects.
         if (stale.get_status() >= 200 && stale.get_status() < 300) {
             counters.counter("beresp-2xx", 1, varnishstat=true);
-        } elseif (stale.get_status() >= 300 && stale.get_status() < 400) {
+        } elsif (stale.get_status() >= 300 && stale.get_status() < 400) {
             counters.counter("beresp-3xx", 1, varnishstat=true);
-        } elseif (stale.get_status() >= 400 && stale.get_status() < 500) {
+        } elsif (stale.get_status() >= 400 && stale.get_status() < 500) {
             counters.counter("beresp-4xx", 1, varnishstat=true);
-        } elseif (stale.get_status() >= 500 && stale.get_status() < 600) {
+        } elsif (stale.get_status() >= 500 && stale.get_status() < 600) {
             counters.counter("beresp-5xx", 1, varnishstat=true);
         }
 
