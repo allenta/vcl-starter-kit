@@ -65,9 +65,12 @@ sub vcl_recv {
             urlplus.query_delete_regex("utm_");
             urlplus.write();
 
-            # HEAD & GET requests are usually cacheable, so additional cleaning and
-            # normalizations are in place. Beware same normalizations are needed
-            # for invalidation methods depending on the caching key.
+            # HEAD & GET requests are usually cacheable, so we do some extra
+            # cleanup and normalization here. Note that the same normalizations
+            # are needed for invalidation methods that use the caching key.
+            # We're being explicit about the 'PURGE' method for clarity, though
+            # it's not strictly needed since 'PURGE' has already been normalized
+            # to 'GET' in 'recv_execute_route_preflight'.
             if (req.method == "HEAD" || req.method == "GET" || req.method == "PURGE") {
                 # Some URL patterns are known to be uncacheable, so we can handle
                 # them properly right away. No need to worry about cleaning up
