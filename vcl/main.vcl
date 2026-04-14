@@ -180,7 +180,9 @@ sub vcl_recv {
         # Beware self-routed cluster requests will override this value later
         # (at this point is too early to reliably detect them).
         #
-        # TODO: adjust the logic as needed to fit your setup.
+        # TODO: adjust this logic as needed for your setup. Keep in mind
+        # 'X-Client-Ip' is used in security-critical checks that depend on
+        # correct IP extraction (e.g., invalidation ACL checks, etc.).
         set req.http.X-Client-Ip = client.ip;
 
         # Log server name to VSL. Same reason as above: NCSA logs.
