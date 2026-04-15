@@ -2,7 +2,7 @@
 
 <h1>
   <p align="center">
-    <img src="https://github.com/allenta/vcl-starter-kit/blob/main/extras/assets/mascot.svg?raw=true" alt="VCLSKi mascot" width="250">
+    <img src="https://raw.githubusercontent.com/allenta/vcl-starter-kit/refs/heads/main/extras/assets/mascot.svg" alt="VCLSKi mascot" width="250">
     <br />VCLSKi
   </p>
 </h1>
