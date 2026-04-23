@@ -9,15 +9,22 @@ server s1 {
 } -repeat 2 -start
 
 varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
-    # Use default 'local' environment for testing, but overriding backends to
-    # point to the mocked ones.
-    include "environment.vcl";
-    sub vcl_init {
+    include "main.vcl";
+
+    # VTC instrumentation subroutines (see 'run-tests.sh').
+
+    sub vtc_post_init_environment {
         environment.set("default-be", "${s1_addr}:${s1_port}");
     }
 
-    # This is an end-to-end test, so we want to use the whole VCL.
-    include "main.vcl";
+    sub vtc_post_init {
+    }
+
+    sub vtc_pre_recv {
+        config.set(
+            "foo:invalidation-secret",
+            req.http.X-Invalidation-Secret);
+    }
 } -start
 
 client c1 {
@@ -48,8 +55,13 @@ client c1 {
     expect resp.status == 200
     expect resp.http.X-Varnish-Cache == "miss cached"
     expect resp.http.X-Varnish-Ykeys == "key1, key2"
+
+    # If a invalidation secret is configured, the same purge should be rejected.
+    txreq -url "/" -hdr "X-Ykeys: key1, key3" -hdr "X-Invalidation-Secret: s3cr3t"
+    rxresp
+    expect resp.status == 403
 } -run
 
-varnish v1 -expect client_req == 4
+varnish v1 -expect client_req == 5
 
 varnish v1 -expect MGT.child_panic == 0
