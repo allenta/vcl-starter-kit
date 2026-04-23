@@ -28,12 +28,13 @@ client c1 {
     txreq -url "/foo"
     rxresp
     expect resp.status == 200
-    expect resp.http.Cache-Control == "maxage=60"
+    expect resp.http.X-Varnish-Cache == "miss cached"
 
     # Ensure the health check endpoint is working properly.
     txreq -url "/health-check/"
     rxresp
     expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
 } -run
 
 varnish v1 -expect client_req == 2

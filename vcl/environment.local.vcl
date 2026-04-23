@@ -19,4 +19,6 @@ backend default_template_be {
 
 sub vcl_init {
     environment.set("default-be", "127.0.0.1:8000");
+
+    # call vtc_post_init_environment;
 }

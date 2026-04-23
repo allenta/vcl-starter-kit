@@ -112,6 +112,11 @@
 ##       never be present.
 ##     - Cache invalidations require two serialized rounds.
 ##
+##   - Across the code, you'll find a few calls to vtc_* subroutines. These
+##     are instrumentation hooks for VTCs. Check the example VTC files and the
+##     'run-tests.sh' script for more details.
+##
+##
 
 vcl 4.1;
 
@@ -146,6 +151,8 @@ import ykey;
 # just before any other logic is intentional to achieve the desired effect.
 
 sub vcl_recv {
+    # call vtc_pre_recv;
+
     # Execute one-time initializations.
     if (req.restarts == 0) {
         # Extract the real client IP to 'X-Client-Ip' (used for logging, ACL
@@ -691,14 +698,8 @@ include "varnish/main.vcl";
 ## POST-ROUTE SUBROUTINES
 ###############################################################################
 
-sub hit_miss_refresh_purged_object {
-    # Clean up normal & soft purge headers.
-    unset req.http.X-Purge;
-    unset req.http.X-Soft-Purge;
-    unset req.http.X-Refresh;
-
-    # Restart the request.
-    return (restart);
+sub vcl_init {
+    # call vtc_post_init;
 }
 
 sub recv_handle_invalidation {
@@ -741,24 +742,6 @@ sub recv_handle_invalidation {
     # Other unsupported invalidation requests.
     } else {
         return (synth(400, "Bad invalidation request"));
-    }
-}
-
-sub hit_miss_handle_invalidation {
-    if (req.http.X-Purge) {
-        set req.http.X-Varnish-Npurged = purge.hard();
-        if (req.http.X-Refresh) {
-            call hit_miss_refresh_purged_object;
-        } else {
-            return (synth(200, "Purged (" + req.http.X-Varnish-Npurged + ")"));
-        }
-    } elsif (req.http.X-Soft-Purge) {
-        set req.http.X-Varnish-Npurged = purge.soft();
-        if (req.http.X-Refresh) {
-            call hit_miss_refresh_purged_object;
-        } else {
-            return (synth(200, "Soft purged (" + req.http.X-Varnish-Npurged + ")"));
-        }
     }
 }
 
@@ -870,6 +853,34 @@ sub vcl_hash {
 
     # No need to execute the built-in 'vcl_hash' logic.
     return (lookup);
+}
+
+sub hit_miss_refresh_purged_object {
+    # Clean up normal & soft purge headers.
+    unset req.http.X-Purge;
+    unset req.http.X-Soft-Purge;
+    unset req.http.X-Refresh;
+
+    # Restart the request.
+    return (restart);
+}
+
+sub hit_miss_handle_invalidation {
+    if (req.http.X-Purge) {
+        set req.http.X-Varnish-Npurged = purge.hard();
+        if (req.http.X-Refresh) {
+            call hit_miss_refresh_purged_object;
+        } else {
+            return (synth(200, "Purged (" + req.http.X-Varnish-Npurged + ")"));
+        }
+    } elsif (req.http.X-Soft-Purge) {
+        set req.http.X-Varnish-Npurged = purge.soft();
+        if (req.http.X-Refresh) {
+            call hit_miss_refresh_purged_object;
+        } else {
+            return (synth(200, "Soft purged (" + req.http.X-Varnish-Npurged + ")"));
+        }
+    }
 }
 
 sub vcl_hit {
