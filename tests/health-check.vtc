@@ -1,0 +1,33 @@
+varnishtest "..."
+
+server s1 {
+    rxreq
+    expect req.url == "/foo"
+    txresp -hdr "Cache-Control: maxage=60"
+} -repeat 1 -start
+
+varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
+    # Use 'local' environment for testing, but overriding backends to point to
+    # the mocked ones.
+    include "${vcl_path}/environment.vcl";
+    sub vcl_init {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+
+    # Include the main VCL for a e2e test.
+    include "${vcl_path}/main.vcl";
+} -start
+
+client c1 {
+    # Just a sanity check to verify the VCL is working as expected and the
+    # backend is properly mocked.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.Cache-Control == "maxage=60"
+
+    # Ensure the health check endpoint is working properly.
+    txreq -url "/health-check/"
+    rxresp
+    expect resp.status == 200
+} -run

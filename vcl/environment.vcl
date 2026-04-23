@@ -6,8 +6,13 @@
 #
 # The contents to keep in your CVS are (1) a reference for what will be generated
 # during deployment; and (2) a handy fallback so you always have a working VCL
-# out of the box.
+# out of the box using the 'local' environment.
+
+import kvstore;
 
 sub vcl_init {
     new environment = kvstore.init();
+    environment.set("id", "local");
 }
+
+include "environment.local.vcl";

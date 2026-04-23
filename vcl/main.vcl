@@ -124,6 +124,7 @@ vcl 4.1;
 ###############################################################################
 
 import accounting;
+import activedns;
 import blob;
 import bodyaccess;
 import cookieplus;

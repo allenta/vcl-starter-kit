@@ -8,10 +8,18 @@ sub vcl_init {
     call init_global_config;
 
     # Default director, potentially useful across multiple routes.
-    # TODO: adjust the director definition to your needs, or remove it a global
-    # one is not needed.
+    # TODO: adjust to your needs, or remove it a global director is not needed.
+    new default_dns_group = activedns.dns_group(environment.get("default-be"));
+    default_dns_group.set_ttl(10s);
+    default_dns_group.set_ttl_rule(abide);
+    default_dns_group.set_update_rule(ignore_empty);
+    if (environment.get("id") != "local") {
+        default_dns_group.set_probe_template(default_template_probe);
+    }
+    default_dns_group.set_backend_template(default_template_be);
+
     new default_dir = udo.director(random);
-    default_dir.add_backend(default_1_be);
+    default_dir.subscribe(default_dns_group.get_tag());
 
     # Request scoped kvstore to use for task-specific data. Mostly useful to
     # track state in backend tasks.

@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  vcl-syntax-check:
+  test:
     runs-on: ubuntu-24.04
 
     steps:
@@ -23,22 +23,42 @@ jobs:
             varnish-plus-ha \
             varnish-plus-vmods-extra
 
-      - name: Uncomment 'akamai.vcl'
-        working-directory: vcl
-        run: sed -i 's/^# \(include "akamai.vcl";\)/\1/' main.vcl
-
       - name: Check VCL syntax
         working-directory: vcl
         run: |
+          check_vcl_syntax() {
+            local output
+
+            output=$(mktemp)
+            if ! varnishd \
+                -C \
+                -f "$PWD/main.vcl" \
+                -p "vcl_path=$PWD:/usr/share/varnish-plus/vcl" \
+                >"$output" 2>&1; then
+              cat "$output"
+              exit 1
+            fi
+          }
+
+          # Check syntax including 'akamai.vcl' and one replication strategy at
+          # a time.
           for REPLICATION in disabled vha cluster; do
-            cp main.vcl main.vcl.bak
-
-            sed -i 's/^\(include "replication-.*\.vcl"\);/# \1;/' main.vcl
-            sed -i "s/^# \(include \"replication-$REPLICATION.vcl\";\)/\1/" main.vcl
-            varnishd \
-              -C \
-              -f "$PWD/main.vcl" \
-              -p "vcl_path=$PWD:/usr/share/varnish-plus/vcl"
-
-            mv main.vcl.bak main.vcl
+            sed -i \
+              -e 's/^# \(include "akamai\.vcl";\)/\1/' \
+              -e 's/^\(include "replication-.*\.vcl"\);/# \1;/' \
+              -e "s/^# \(include \"replication-$REPLICATION\.vcl\";\)/\1/" \
+              main.vcl
+            check_vcl_syntax
           done
+          git checkout -- main.vcl
+
+          # Check syntax including one environment at a time.
+          for ENVIRONMENT in local pro; do
+            sed -i "s/^include \"environment\..*\.vcl\";/include \"environment.$ENVIRONMENT.vcl\";/" environment.vcl
+            check_vcl_syntax
+          done
+          git checkout -- environment.vcl
+
+      - name: Run tests
+        working-directory: tests
+        run: ./run-tests.sh

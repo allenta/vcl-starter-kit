@@ -89,7 +89,7 @@
               environment.set("az", "{{ az }}");
           }
 
-          include "environment.{{ env }}.{{ dc }}.vcl";
+          include "environment.{{ env }}.vcl";
 
     - name: Check syntax of files in the VCL staging area
       when: vcl.check

@@ -149,73 +149,26 @@ In our experience, most of these features are the bare minimum for any VCL setup
 <details>
 <summary><strong>What if I want to discover my backends dynamically?</strong></summary><br/>
 
-VCLSKi starts you off with a static backend (`default_1_be` in `backends.vcl`) and a director (`default_dir` in `config.vcl`) that all routes share. But that's just a starting point. If you want to get fancy with dynamic backends, the best move is to **combine the [udo VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/udo/) with either the [nodes VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/nodes/) or the [activedns VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/activedns/)**.
+VCLSKi already gives you a single dynamic backend (`default_template_be` in `environment.*.vcl`) plus a director (`default_dir` in `config.vcl`) shared by all routes. You don't strictly need this setup (static backends are totally fine), but it's really handy if you want to automate VCL testing or keep one VCL config across all environments. Out of the box, this is powered by a **combination of the [udo VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/udo/) and the [activedns VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/activedns/)**.
 
-For example, for a `foo` route, you could create a backend and a probe template in `foo/backends.vcl`:
-```vcl
-probe foo_template_probe {
-    .request =
-        "HEAD /probe/ HTTP/1.1"
-        "Host: foo.com"
-        "Connection: close";
-    .expected_response = 200;
-    .timeout = 1s;
-    .interval = 5s;
-    .initial = 3;
-    .window = 5;
-    .threshold = 3;
-}
-
-backend foo_template_be {
-    .host = "0.0.0.0"; # Host will be dynamically set.
-    .host_header = "foo.com";
-    .ssl = 0;
-    .connect_timeout = 1s;
-    .first_byte_timeout = 20s;
-    .between_bytes_timeout = 20s;
-    .last_byte_timeout = 60s;
-}
-```
-
-Then, in `foo/config.vcl`, discover the backends using the activedns VMOD, for example assuming `foo` is a name in `/etc/hosts`:
+If you'd rather discover backends from a `backends.conf` file using the [nodes VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/nodes/), the end result is pretty much the same:
 ```vcl
 sub vcl_init {
     ...
 
-    ###########################################################################
-    ## ROUTE DIRECTORS
-    ###########################################################################
-
-    new foo_dns_group = activedns.dns_group("foo:8000");
-    foo_dns_group.set_ttl(10s);
-    foo_dns_group.set_ttl_rule(abide);
-    foo_dns_group.set_update_rule(ignore_empty);
-    foo_dns_group.set_nsswitch_rule(files_only);
-    foo_dns_group.set_probe_template(foo_template_probe);
-    foo_dns_group.set_backend_template(foo_template_be);
-
-    new foo_dir = udo.director(random);
-    foo_dir.subscribe(foo_dns_group.get_tag());
-}
-```
-
-Same, but discovering backends through a `backends.conf` file using the nodes VMOD:
-```vcl
-sub vcl_init {
-    ...
-
-    ###########################################################################
-    ## ROUTE DIRECTORS
-    ###########################################################################
-
-    nodes.set_default_probe_template(foo_template_probe);
-    nodes.set_default_backend_template(foo_template_be);
-    new foo_nodes_conf = nodes.config_group(
+    # Default director, potentially useful across multiple routes.
+    if (environment.get("id") != "local") {
+      nodes.set_default_probe_template(default_template_probe);
+    }
+    nodes.set_default_backend_template(default_template_be);
+    new default_nodes_conf = nodes.config_group(
         utils.lookup_file("backends.conf"),
-        group="foo");
+        group=environment.get("default-be-tag"));
 
-    new foo_dir = udo.director(random);
-    foo_dir.subscribe(foo_nodes_conf.get_tag());
+    new default_dir = udo.director(random);
+    default_dir.subscribe(default_nodes_conf.get_tag());
+
+    ...
 }
 ```
 
@@ -265,7 +218,7 @@ Quick reminders: (1) set `--user` to your username; (2) use `--limit` to make su
 
 It's totally normal to have slightly different VCL configs for each environment. We like to keep things tidy by using **parallel Git branches for each environment**, instead of folders or template systems. Branches make it easy to see what's different across environments, cherry-pick changes, and keep everything organized. Just try to keep the differences small, so your branches don't drift too far apart and it's easy to spot any unexpected divergences.
 
-If you're up for a bit more work, you could even have a **single VCL configuration that works for all environments by using context about the environment and some VCL logic to handle the differences**. Depending on your setup, that extra effort might be worth it! The [example Ansible playbook](extras/ansible/vcl-deployment-playbook.yml) shows how you can whip up a [`environment.vcl`](vcl/environment.vcl) file on the fly with environment-specific details: super handy to have a single VCL configuration that adapts to each environment.
+If you're up for a bit more work, you could even have a **single VCL configuration that works for all environments by using context about the environment and some VCL logic to handle the differences**. Depending on your setup, that extra effort might be worth it! The [example Ansible playbook](extras/ansible/vcl-deployment-playbook.yml) shows how you can whip up a [`environment.vcl`](vcl/environment.vcl) file on the fly with environment-specific details: super handy to have a single VCL configuration that adapts to each environment. Out of the box, VCLSKi already showcases this approach by using the `environment` kvstore object to decide how to adapt the only backend in the configuration based on the environment.
 </details>
 
 <details>
