@@ -11,6 +11,8 @@
 sub vcl_init {
     new environment = kvstore.init();
     environment.set("id", "local");
+    environment.set("dc", "ES");
+    environment.set("az", "A");
 }
 
 include "environment-local.vcl";
