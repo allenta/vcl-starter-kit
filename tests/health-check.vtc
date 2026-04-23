@@ -1,4 +1,4 @@
-varnishtest "..."
+varnishtest "Test health-check URL for upper layer"
 
 server s1 {
     rxreq
@@ -7,15 +7,15 @@ server s1 {
 } -repeat 1 -start
 
 varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
-    # Use 'local' environment for testing, but overriding backends to point to
-    # the mocked ones.
-    include "${vcl_path}/environment.vcl";
+    # Use default 'local' environment for testing, but overriding backends to
+    # point to the mocked ones.
+    include "environment.vcl";
     sub vcl_init {
         environment.set("default-be", "${s1_addr}:${s1_port}");
     }
 
-    # Include the main VCL for a e2e test.
-    include "${vcl_path}/main.vcl";
+    # This is an end-to-end test, so we want to use the whole VCL.
+    include "main.vcl";
 } -start
 
 client c1 {
@@ -31,3 +31,7 @@ client c1 {
     rxresp
     expect resp.status == 200
 } -run
+
+varnish v1 -expect client_req == 2
+
+varnish v1 -expect MGT.child_panic == 0
