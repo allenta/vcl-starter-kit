@@ -23,7 +23,7 @@ sed -i \
 sed -i \
     -e 's/^\s*# \(call vtc_.*;\)$/\1/' \
     "$TMPDIR/main.vcl" \
-    "$TMPDIR/environment.local.vcl"
+    "$TMPDIR/environment-local.vcl"
 
 # Discover VTC files to run.
 if [[ $# -gt 0 ]]; then

@@ -13,4 +13,4 @@ sub vcl_init {
     environment.set("id", "local");
 }
 
-include "environment.local.vcl";
+include "environment-local.vcl";

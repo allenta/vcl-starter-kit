@@ -149,7 +149,7 @@ In our experience, most of these features are the bare minimum for any VCL setup
 <details>
 <summary><strong>What if I want to discover my backends dynamically?</strong></summary><br/>
 
-VCLSKi already gives you a single dynamic backend (`default_template_be` in `environment.*.vcl`) plus a director (`default_dir` in `config.vcl`) shared by all routes. You don't strictly need this setup (static backends are totally fine), but it's really handy if you want to automate VCL testing or keep one VCL config across all environments. Out of the box, this is powered by a **combination of the [udo VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/udo/) and the [activedns VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/activedns/)**.
+VCLSKi already gives you a single dynamic backend (`default_template_be` in `environment-*.vcl`) plus a director (`default_dir` in `config.vcl`) shared by all routes. You don't strictly need this setup (static backends are totally fine), but it's really handy if you want to automate VCL testing or keep one VCL config across all environments. Out of the box, this is powered by a **combination of the [udo VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/udo/) and the [activedns VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/activedns/)**.
 
 If you'd rather discover backends from a `backends.conf` file using the [nodes VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/nodes/), the end result is pretty much the same:
 ```vcl
