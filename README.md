@@ -218,7 +218,9 @@ Quick reminders: (1) set `--user` to your username; (2) use `--limit` to make su
 
 It's totally normal to have slightly different VCL configs for each environment. We like to keep things tidy by using **parallel Git branches for each environment**, instead of folders or template systems. Branches make it easy to see what's different across environments, cherry-pick changes, and keep everything organized. Just try to keep the differences small, so your branches don't drift too far apart and it's easy to spot any unexpected divergences.
 
-If you're up for a bit more work, you could even have a **single VCL configuration that works for all environments by using context about the environment and some VCL logic to handle the differences**. Depending on your setup, that extra effort might be worth it! The [example Ansible playbook](extras/ansible/vcl-deployment-playbook.yml) shows how you can whip up a [`environment.vcl`](vcl/environment.vcl) file on the fly with environment-specific details: super handy to have a single VCL configuration that adapts to each environment. Out of the box, VCLSKi already showcases this approach by using the `environment` kvstore object to decide how to adapt the only backend in the configuration based on the environment.
+If you're up for a bit more work, you could even have a **single VCL configuration that works for all environments by using context about the environment and some VCL logic to handle the differences**. Depending on your setup, that extra effort might be worth it! The [example Ansible playbook](extras/ansible/vcl-deployment-playbook.yml) shows how you can whip up a [`environment.vcl`](vcl/environment.vcl) file on the fly with environment-specific details: super handy to have a single VCL configuration that adapts to each environment.
+
+Out of the box, VCLSKi already showcases this approach by using the `environment` kvstore object to decide how to adapt the only backend in the configuration based on the environment.
 </details>
 
 <details>
