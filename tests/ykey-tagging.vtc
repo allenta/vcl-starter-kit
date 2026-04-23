@@ -1,0 +1,55 @@
+varnishtest "Test Ykey tagging through the 'X-Varnish-Ykeys' header"
+
+server s1 {
+    rxreq
+    expect req.url == "/foo"
+    txresp \
+        -hdr "Cache-Control: maxage=60" \
+        -hdr "X-Varnish-Ykeys: key1, key2"
+} -repeat 2 -start
+
+varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
+    # Use default 'local' environment for testing, but overriding backends to
+    # point to the mocked ones.
+    include "environment.vcl";
+    sub vcl_init {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+
+    # This is an end-to-end test, so we want to use the whole VCL.
+    include "main.vcl";
+} -start
+
+client c1 {
+    # Initial request for a cacheable object.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+
+    # Subsequent request should be a cache hit with the same Ykeys.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+
+    # Now, purge using one of the Ykeys and verify the object is purged.
+    txreq -url "/" -hdr "X-Ykeys: key1, key3"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Purged (1)"
+
+    # Subsequent request should be a cache miss again.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+} -run
+
+varnish v1 -expect client_req == 4
+
+varnish v1 -expect MGT.child_panic == 0
