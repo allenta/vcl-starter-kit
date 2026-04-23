@@ -220,7 +220,15 @@ It's totally normal to have slightly different VCL configs for each environment.
 
 If you're up for a bit more work, you could even have a **single VCL configuration that works for all environments by using context about the environment and some VCL logic to handle the differences**. Depending on your setup, that extra effort might be worth it! The [example Ansible playbook](extras/ansible/vcl-deployment-playbook.yml) shows how you can whip up a [`environment.vcl`](vcl/environment.vcl) file on the fly with environment-specific details: super handy to have a single VCL configuration that adapts to each environment.
 
-Out of the box, VCLSKi already showcases this approach by using the `environment` kvstore object to decide how to adapt the only backend in the configuration based on the environment.
+Out of the box, **VCLSKi already showcases this approach by using the `environment` kvstore object to decide how to adapt the only backend in the configuration based on the environment**.
+</details>
+
+<details>
+<summary><strong>Any suggestion to automate testing of my VCL?</strong></summary><br/>
+
+Our preferred tool for automated testing is [`varnishtest`](https://www.varnish-software.com/developers/tutorials/testing-varnish-varnishtest/), although it is not always the best option for the kind of end-to-end testing most VCL setups need. Out of the box, **VCLSKi includes [some tests](tests/) that show a practical way to build this kind of testing on top of `varnishtest` with minimal impact on your VCL**.
+
+The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. Check the example VTC files for inspiration when creating your own.
 </details>
 
 <details>
