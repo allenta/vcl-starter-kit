@@ -54,7 +54,7 @@ jobs:
 
           # Check syntax including one environment at a time.
           for ENVIRONMENT in local pro; do
-            sed -i "s/^include \"environment\..*\.vcl\";/include \"environment-$ENVIRONMENT.vcl\";/" environment.vcl
+            sed -i "s/^include \"environment-.*\.vcl\";/include \"environment-$ENVIRONMENT.vcl\";/" environment.vcl
             check_vcl_syntax
           done
           git checkout -- environment.vcl
