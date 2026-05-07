@@ -8,7 +8,7 @@ sub vcl_init {
     call init_global_config;
 
     # Default director, potentially useful across multiple routes.
-    # TODO: adjust to your needs, or remove it a global director is not needed.
+    # TODO: adjust to your needs, or remove if a global director is not needed.
     new default_dns_group = activedns.dns_group(environment.get("default-be"));
     default_dns_group.set_ttl(10s);
     default_dns_group.set_ttl_rule(abide);

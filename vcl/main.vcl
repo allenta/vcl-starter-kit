@@ -476,7 +476,7 @@ sub vcl_synth {
         return (deliver);
     }
 
-    # Handle synthetic responses bellow 600 not reaching route's 'vcl_synth'
+    # Handle synthetic responses below 600 not reaching route's 'vcl_synth'
     # subroutine. Beware route might be unknown at this point.
     if (resp.status < 600 && (
         !req.http.X-Varnish-Route ||
@@ -807,7 +807,7 @@ sub vcl_recv {
         std.cache_req_body(std.bytes(config.get(req.http.X-Varnish-Route + ":max-cacheable-body-size"), 32KB));
         if (bodyaccess.len_req_body() == -1) {
             # TODO: consider handling this case as an uncacheable request: set
-            # set 'req.http.X-Varnish-Uncacheable' + pass.
+            # 'req.http.X-Varnish-Uncacheable' + pass.
             return (synth(413, "Request body size exceeds the caching limit"));
         } else {
             set req.http.X-Varnish-Bodyaccess-Method = req.method;
@@ -913,7 +913,7 @@ sub vcl_deliver {
     unset resp.http.X-Host;
     unset resp.http.X-Url;
 
-    # Unless this is a internal self-routed cluster request, clean up caching
+    # Unless this is an internal self-routed cluster request, clean up caching
     # control headers targeting the origin cache. Beware this is intentionally
     # done here (rather than in 'vcl_backend_response') (1) to ensure proper
     # handling of conditional backend requests that receive 304 responses; and
@@ -931,7 +931,7 @@ sub vcl_deliver {
         }
     }
 
-    # Unless this is a internal self-routed cluster request, inject informational
+    # Unless this is an internal self-routed cluster request, inject informational
     # headers. These headers should be included in all responses, reaching both
     # the upstream CDN and the client. Beware of disclosing sensitive
     # information here.
