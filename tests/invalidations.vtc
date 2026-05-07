@@ -1,0 +1,298 @@
+varnishtest "Test invalidation methods"
+
+# VTC_SUBS: vtc_post_init_environment vtc_pre_recv
+
+server s1 {
+    rxreq
+    expect req.url == "/foo"
+    txresp \
+        -hdr "Cache-Control: max-age=60, stale-while-revalidate=10" \
+        -hdr "X-Varnish-Ykeys: key1, key2"
+} -repeat 12 -start
+
+varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
+    include "main.vcl";
+
+    # VTC instrumentation subroutines (see 'run-tests.sh').
+
+    sub vtc_post_init_environment {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+
+    sub vtc_pre_recv {
+        config.set(
+            "foo:invalidation-secret",
+            req.http.X-Invalidation-Secret);
+
+        config.set(
+            "foo:ykeys-namespace",
+            req.http.X-Ykeys-Namespace);
+
+        if (!req.http.X-Bans-Prefix) {
+            set req.http.X-Bans-Prefix = "obj.status != 0";
+        }
+        config.set(
+            "foo:bans-prefix",
+            req.http.X-Bans-Prefix);
+    }
+} -start
+
+client c1 {
+    ##
+    ## Preamble.
+    ##
+
+    # Initial request for a cacheable object (fetch #1).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Purge.
+    ##
+
+    # Purge the content.
+    txreq -url "/foo" -hdr "X-Purge: 1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Purged (1)"
+
+    # Subsequent request should be a cache miss again (fetch #2).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # PURGE method can be used as well to purge a content.
+    txreq -req "PURGE" -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Purged (1)"
+
+    # Subsequent request should be a cache miss again (fetch #3).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    ##
+    ## Purge + refresh.
+    ##
+
+    # Purge the content, with expicit refresh (fetch #4).
+    txreq -url "/foo" -hdr "X-Purge: 1" -hdr "X-Refresh: 1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Soft purge.
+    ##
+
+    # Soft purge the content.
+    txreq -url "/foo" -hdr "X-Soft-Purge: 1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Soft purged (1)"
+
+    # Subsequent request should be a cache hit (stale content, a bgfetch will
+    # be spawned).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 3
+
+    # Wait for the bgfetch to complete (fetch #5).
+    delay 1
+
+    ##
+    ## Soft purge + refresh.
+    ##
+
+    # XXX: A bug currently in Varnish Enterprise affects this test, so for now,
+    # an alternative version is provided.
+
+    # Soft purge the content, with explicit refresh. The stale content should be
+    # served, but instead, Varnish decides this is a miss and does a synchronous
+    # fetch (fetch #6).
+    txreq -url "/foo" -hdr "X-Soft-Purge: 1" -hdr "X-Refresh: 1"
+    rxresp
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # # Soft purge the content, with explicit refresh. The stale content is served
+    # # while a bgfetch is spawned.
+    # txreq -url "/foo" -hdr "X-Soft-Purge: 1" -hdr "X-Refresh: 1"
+    # rxresp
+    # expect resp.http.X-Varnish-Cache == "hit cached"
+    # expect resp.http.X-Varnish-Hits == 2
+
+    # # Wait for the bgfetch to complete (fetch #6).
+    # delay 1
+
+    ##
+    ## Purge using ykeys.
+    ##
+
+    # Purge using one of the Ykeys.
+    txreq -url "/" -hdr "X-Ykeys: key1, key3"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    # XXX: This expect is also affected by the aforementioned bug (see "Soft
+    # purge + refresh). As for now, two objects are being purged instead of one.
+    expect resp.reason == "Purged (2)"
+
+    # Subsequent request should be a cache miss again (fetch #7).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # Purges with Ykeys in a different namespace should not affect the cached
+    # content.
+    txreq -url "/" -hdr "X-Ykeys: key1, key3" -hdr "X-Ykeys-Namespace: bar"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Purged (0)"
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Soft purge using ykeys.
+    ##
+
+    # Soft purge using one of the Ykeys.
+    txreq -url "/" -hdr "X-Soft-Ykeys: key1, key3"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Soft purged (1)"
+
+    # Subsequent request should be a cache hit (stale content, a bgfetch will
+    # be spawned).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 2
+
+    # Wait for the bgfetch to complete (fetch #8).
+    delay 1
+
+    ##
+    ## Ban.
+    ##
+
+    # Purge using a ban.
+    txreq -url "/" -hdr "X-Ban: obj.http.X-Url == /foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Ban added"
+
+    # Subsequent request should be a cache miss again (fetch #9).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # The BAN method can be used as an easy way to purge a certain URL using a
+    # ban.
+    txreq -req "BAN" -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Ban added"
+
+    # Subsequent request should be a cache miss again (fetch #10).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # Bans may be prefixed with extra expressions in the configuration. A
+    # non-matching expression is added here to the configuration and the same
+    # ban that previously worked, doesn't purge the content this time.
+    txreq -req "BAN" -url "/foo" -hdr "X-Bans-Prefix: obj.status != 200"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Ban added"
+
+    # Subsequent request should be a cache hit (the content hasn't been purged
+    # by the ban).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Forced cache miss.
+    ##
+
+    # A cache miss can be forced with the X-Forced-Miss header (fetch #11).
+    txreq -url "/foo" -hdr "X-Forced-Miss: 1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # A cache miss can also be forced with the REFRESH method (fetch #12).
+    txreq -req "REFRESH" -url "/foo" -hdr "X-Forced-Miss: 1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    ##
+    ## Invalidation secret.
+    ##
+
+    # If an invalidation secret is configured, any invalidation request without
+    # the propert token should be rejected.
+    txreq -url "/" -req "PURGE" -hdr "X-Invalidation-Secret: s3cr3t"
+    rxresp
+    expect resp.status == 403
+} -run
+
+varnish v1 -expect client_req == 26
+
+varnish v1 -expect MGT.child_panic == 0

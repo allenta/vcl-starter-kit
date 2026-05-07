@@ -1,0 +1,91 @@
+varnishtest "Test X-Varnish-* backend headers to control ttl, grace and keep"
+
+# VTC_SUBS: vtc_post_init_environment vtc_pre_recv
+
+server s1 {
+    # While standard Cache-Control mechanism is in full effect for seting TTL,
+    # grace (stale-while-revalidate) and keep (stale-if-error), alternative
+    # X-Varnish-* headers can also be used and they'll have precedence over any
+    # other mechanism. Note that X-Varnish-Stale-If-Error == grace + keep.
+    # Also, the whole object's max lifetime (ttl + grace + keep) can be limited
+    # by configuration (see below).
+    rxreq
+    txresp \
+        -hdr "Cache-Control: max-age=60, stale-while-revalidate=30" \
+        -hdr "X-Varnish-Ttl: 5m" \
+        -hdr "X-Varnish-Stale-While-Revalidate: 1m" \
+        -hdr "X-Varnish-Stale-If-Error: 1d"
+} -repeat 4 -start
+
+varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
+    include "main.vcl";
+
+    # VTC instrumentation subroutines (see 'run-tests.sh').
+
+    sub vtc_post_init_environment {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+
+    sub vtc_pre_recv {
+        # Object lifetime in cache may be limited by configuration.
+        config.set(
+            "foo:max-object-lifetime",
+            req.http.X-Max-Object-Lifetime);
+    }
+} -start
+
+client c1 {
+    # Initial request for a cacheable object. TTL, grace and keep are set as
+    # defined by the backend by returning X-Varnish-* headers.
+    txreq -url "/foo/1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "300.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "60.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "86340.000"
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo/1"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "300.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "60.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "86340.000"
+
+    # An object's max lifetime may be limited by configuration. This will start
+    # by reducing the keep time until the whole object lifetime
+    # (ttl + grace + keep) fits the limit.
+    txreq -url "/foo/2" -hdr "X-Max-Object-Lifetime: 1d"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "300.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "60.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "86040.000"
+
+    # A smaller limit will exhaust the keep time and start taking from grace
+    # time.
+    txreq -url "/foo/3" -hdr "X-Max-Object-Lifetime: 330s"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "300.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "30.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "0.000"
+
+    # An even smaller limit will exhaust keep and grace time and start taking
+    # from the ttl.
+    txreq -url "/foo/4" -hdr "X-Max-Object-Lifetime: 100s"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "100.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "0.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "0.000"
+} -run
+
+varnish v1 -expect client_req == 5
+
+varnish v1 -expect MGT.child_panic == 0

@@ -1,0 +1,67 @@
+varnishtest "Test X-Varnish-Uncacheable backend header to control cacheability"
+
+# VTC_SUBS: vtc_post_init_environment
+
+server s1 {
+    rxreq
+    expect req.url == "/foo"
+    txresp \
+        -hdr "X-Varnish-Uncacheable: hfm"
+
+    rxreq
+    expect req.url == "/foo"
+    txresp \
+        -hdr "X-Varnish-Uncacheable: hfm"
+
+    rxreq
+    expect req.url == "/bar"
+    txresp \
+        -hdr "X-Varnish-Uncacheable: hfp"
+
+    rxreq
+    expect req.url == "/bar"
+    txresp \
+        -hdr "X-Varnish-Uncacheable: hfp"
+} -repeat 1 -start
+
+varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
+    include "main.vcl";
+
+    # VTC instrumentation subroutines (see 'run-tests.sh').
+
+    sub vtc_post_init_environment {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+} -start
+
+client c1 {
+    # Initial request for an object that responds with a hit-for-miss. This is
+    # an uncacheable object.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss uncacheable"
+
+    # Subsequent request should be a straight miss.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss uncacheable"
+
+    # Initial request for an object that responds with a hit-for-pass. This is
+    # an uncacheable object.
+    txreq -url "/bar"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss uncacheable"
+
+    # Subsequent request should be a pass.
+    txreq -url "/bar"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "pass uncacheable"
+} -run
+
+varnish v1 -expect client_req == 4
+
+varnish v1 -expect MGT.child_panic == 0

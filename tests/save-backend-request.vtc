@@ -1,0 +1,109 @@
+varnishtest "Test save backend request feature (retries + revive)"
+
+# VTC_SUBS: vtc_post_init_environment vtc_post_init
+
+server s1 {
+    rxreq
+    expect req.url == "/foo"
+    txresp -status 500
+} -repeat 2 -start
+
+server s2 {
+    rxreq
+    expect req.url == "/foo"
+    txresp \
+        -hdr "Cache-Control: max-age=60, stale-while-revalidate=0, stale-if-error=120"
+
+    rxreq
+    expect req.url == "/foo"
+    txresp -status 500
+} -repeat 1 -start
+
+varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl+backend {
+    include "main.vcl";
+
+    # VCL patching.
+
+    sub vcl_init {
+        new vtc_dir = udo.director(fallback);
+        vtc_dir.add_backend(s1);
+        vtc_dir.add_backend(s2);
+    }
+
+    sub vcl_backend_fetch {
+        # Override the backend selection.
+        if (bereq.retries == 0) {
+            set bereq.backend = vtc_dir.backend();
+        }
+    }
+
+    # VTC instrumentation subroutines (see 'run-tests.sh').
+
+    sub vtc_post_init_environment {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+
+    sub vtc_post_init {
+        # Max number of retries is configurable.
+        config.set(
+            "foo:max-retries",
+            "1");
+
+        # TTL and grace for revived objects is configurable.
+        config.set(
+            "foo:stale-revive-ttl",
+            "30s");
+        config.set(
+            "foo:stale-revive-grace",
+            "1m");
+    }
+} -start
+
+client c1 {
+    # Initial request for a cacheable object (fetch s1#1 and fetch s2#1). Server
+    # s1 fails but the VCL retries with s2 and successfully gets a response.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "60.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "0.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "120.000"
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 1
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "60.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "0.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "120.000"
+
+    # Soft purge the content. The content's TTL goes to 0 but it is still kept
+    # in the cache because it has a keep time defined.
+    txreq -url "/foo" -hdr "X-Soft-Purge: 1"
+    rxresp
+    expect resp.status == 200
+    expect resp.reason == "Soft purged (1)"
+
+    # Next request is a miss. A synchronous fetch is done and both the backends
+    # respond with an error (fetch s1#2 and fetch s2#2), so the VCL revives the
+    # object and returns it with the configured TTL and grace for revived
+    # objects.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+    expect resp.http.X-Varnish-Debug-Initial-Ttl == "60.000"
+    expect resp.http.X-Varnish-Debug-Initial-Grace == "0.000"
+    expect resp.http.X-Varnish-Debug-Initial-Keep == "120.000"
+    expect resp.http.X-Varnish-Debug-Ttl == "30.000"
+    expect resp.http.X-Varnish-Debug-Grace == "60.000"
+} -run
+
+varnish v1 -expect client_req == 4
+
+varnish v1 -expect MGT.child_panic == 0
