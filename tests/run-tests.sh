@@ -8,22 +8,15 @@ ROOT="$(dirname "$(realpath "$0")")"
 TEMP="$(mktemp -d)"
 trap 'rm -rf "$TEMP"' EXIT
 
-# Copy VCL files to a temporary location and apply some tweaks:
+# Prepare a base copy of VCL files with common tweaks:
 #   - Include 'akamai.vcl' (might be handy for some tests).
 #   - Use 'replication-disabled.vcl' as the replication option.
-#   - Activate calls to subroutines defined in VTCs for extra instrumentation.
-VCL_PATH="$TEMP/vcl"
-mkdir -p "$VCL_PATH"
-cp -r "$ROOT/../vcl"/. "$VCL_PATH"/
+cp -r "$ROOT/../vcl"/. "$TEMP/vcl/"
 sed -i \
     -e 's/^# \(include "akamai.vcl";\)/\1/' \
     -e 's/^\(include "replication-.*\.vcl"\);/# \1;/' \
     -e "s/^# \(include \"replication-disabled.vcl\";\)/\1/" \
-    "$VCL_PATH/main.vcl"
-sed -i \
-    -e 's/^\s*# \(call vtc_.*;\)$/\1/' \
-    "$VCL_PATH/main.vcl" \
-    "$VCL_PATH/environment-local.vcl"
+    "$TEMP/vcl/main.vcl"
 
 # Discover VTC files to run.
 if [[ $# -gt 0 ]]; then
@@ -32,11 +25,24 @@ else
     mapfile -t VTCS < <(find "$ROOT" -name '*.vtc' -type f | sort)
 fi
 
-# Run VTC tests until the first failure is encountered. Use a separate temporary
-# directory for each test.
+# Run VTC tests until the first failure is encountered. For each test, create a
+# per-test copy of the VCL files and only uncomment the instrumentation points
+# declared in the VTC file via the '# VTC_SUBS: sub1 sub2 ...' comment.
 for vtc in "${VTCS[@]}"; do
-    TMP_PATH="$TEMP/tmp/$(basename "$vtc" .vtc)"
-    mkdir -p "$TMP_PATH"
+    VCL_PATH="$TEMP/$(basename "$vtc" .vtc)/vcl"
+    TMP_PATH="$TEMP/$(basename "$vtc" .vtc)/tmp"
+
+    mkdir -p "$TMP_PATH" "$VCL_PATH"
+    cp -r "$TEMP/vcl"/. "$VCL_PATH"
+
+    mapfile -t VTC_SUBS < <(grep -oP '(?<=^# VTC_SUBS:)\s.*' "$vtc" | grep -oP '\S+' || true)
+    for sub in "${VTC_SUBS[@]}"; do
+        find "$VCL_PATH" -name '*.vcl' -exec \
+            sed -i \
+                -e "s/^\(\s*\)# \(call ${sub};\)$/\1\2/" \
+                {} +
+    done
+
     varnishtest \
         -Dvcl_path="$VCL_PATH" \
         -Dtmp_path="$TMP_PATH" \

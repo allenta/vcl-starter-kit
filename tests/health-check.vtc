@@ -1,5 +1,7 @@
 varnishtest "Test health-check URL for upper layer"
 
+# VTC_SUBS: vtc_post_init_environment
+
 server s1 {
     rxreq
     expect req.url == "/foo"
@@ -13,12 +15,6 @@ varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
 
     sub vtc_post_init_environment {
         environment.set("default-be", "${s1_addr}:${s1_port}");
-    }
-
-    sub vtc_post_init {
-    }
-
-    sub vtc_pre_recv {
     }
 } -start
 
