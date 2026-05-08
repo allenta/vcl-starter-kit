@@ -25,7 +25,7 @@ probe default_template_probe {
 backend default_template_be {
     .host = "0.0.0.0"; # Host will be dynamically set.
     .host_header = "foo.com";
-    .ssl = 1;
+    .tls = true;
     .connect_timeout = 1s;
     .first_byte_timeout = 20s;
     .between_bytes_timeout = 20s;
