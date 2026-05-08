@@ -116,7 +116,6 @@
 ##     are instrumentation hooks for VTCs. Check the example VTC files and the
 ##     'run-tests.sh' script for more details.
 ##
-##
 
 vcl 4.1;
 
@@ -766,12 +765,25 @@ sub vcl_recv {
         call recv_handle_invalidation;
     }
 
-    # SPDY or HTTP/2.0 is not supported.
+    # VSV00018. Require 'req.url' to start with '/', unless the request method
+    # is CONNECT or OPTIONS. For CONNECT, no additional check is applied (and
+    # CONNECT is not allowed by default). For OPTIONS, '*' is also allowed.
+    if ((req.url != "*" || req.method != "OPTIONS") &&
+        req.url !~ "^/" && req.method != "CONNECT") {
+        return (synth(400, "Bad request"));
+    }
+
+    # This will never happen in properly formed traffic (see: RFC7540).
     if (req.method == "PRI") {
         return (synth(405, "Not supported"));
     }
 
-    # Non-RFC2616 or CONNECT?
+    # In HTTP/1.1, 'Host' header is required.
+    if (!req.http.Host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
+        return (synth(400, "Bad request"));
+    }
+
+    # Non-RFC2616 or CONNECT which is weird.
     if (req.method != "GET" &&
         req.method != "HEAD" &&
         req.method != "PUT" &&
