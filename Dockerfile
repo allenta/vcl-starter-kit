@@ -19,6 +19,7 @@ RUN apt update \
         gpg \
         less \
         nano \
+        pkg-config \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,6 +27,7 @@ RUN curl -L -s https://packagecloud.io/install/repositories/varnishplus/60-enter
     && apt update \
     && apt install -y \
         varnish-plus=${VARNISH_VERSION} \
+        varnish-plus-dev=${VARNISH_VERSION} \
         varnish-plus-ha=${VARNISH_VERSION} \
         varnish-plus-vmods-extra=${VARNISH_VERSION} \
     && apt clean \

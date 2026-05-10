@@ -226,7 +226,7 @@ Out of the box, **VCLSKi already showcases this approach by using the `environme
 <details>
 <summary><strong>Any suggestion to automate testing of my VCL?</strong></summary><br/>
 
-Our preferred tool for automated testing is [`varnishtest`](https://www.varnish-software.com/developers/tutorials/testing-varnish-varnishtest/), although it is not always the best option for the kind of end-to-end testing most VCL setups need. Out of the box, **VCLSKi includes [some tests](tests/) that show a practical way to build this kind of testing on top of `varnishtest` with minimal impact on your VCL**.
+Our preferred tool for automated testing is [`varnishtest`](https://www.varnish-software.com/developers/tutorials/testing-varnish-varnishtest/), although it is not always the best option for the kind of end-to-end testing most VCL setups need. Out of the box, **VCLSKi includes [some tests](tests/vtc/) that show a practical way to build this kind of testing on top of `varnishtest` with minimal impact on your VCL**.
 
 The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. Check the example VTC files for inspiration when creating your own.
 </details>

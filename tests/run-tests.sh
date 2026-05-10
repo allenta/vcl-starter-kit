@@ -59,3 +59,7 @@ check-vcl-syntax
 echo
 echo '> Running VTC tests...'
 "$ROOT/vtc/run-tests.sh"
+
+echo
+echo '> Running Go tests...'
+"$ROOT/go/run-tests.sh"
