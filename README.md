@@ -228,7 +228,9 @@ Out of the box, **VCLSKi already showcases this approach by using the `environme
 
 Our preferred tool for automated testing is [`varnishtest`](https://www.varnish-software.com/developers/tutorials/testing-varnish-varnishtest/), although it is not always the best option for the kind of end-to-end testing most VCL setups need. Out of the box, **VCLSKi includes [some tests](tests/vtc/) that show a practical way to build this kind of testing on top of `varnishtest` with minimal impact on your VCL**.
 
-The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. **Check the example the `vtc/run-tests.sh` script and VTC files for inspiration when creating your own**. Alternative approaches like using [the Go SDK for Varnish](https://github.com/varnish/varnish-go) will be showcased in the future when they support Varnish Enterprise.
+The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. **Check the example the `vtc/run-tests.sh` script and VTC files for inspiration when creating your own**.
+
+Alternative approaches like using [the Go SDK for Varnish](https://github.com/varnish/varnish-go) will be showcased in the future when they support Varnish Enterprise.
 </details>
 
 <details>
