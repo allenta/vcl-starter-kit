@@ -1,0 +1,30 @@
+---
+
+#
+# Cheat sheet:
+#   $ echo -e "UID=$(id -u)\nGID=$(id -g)" > .env
+#   $ docker compose up --build --detach
+#   $ docker compose exec --user dev --workdir /mnt/host dev bash
+#     $ ./tests/run-tests.sh
+#   $ docker compose down --volumes --remove-orphans
+#
+
+name: vclski
+
+services:
+  dev:
+    hostname: dev
+    build:
+      context: .
+    init: true
+    privileged: true
+    environment:
+      HOST_UID: ${UID:?}
+      HOST_GID: ${GID:?}
+    volumes:
+      - .:/mnt/host.raw
+    tmpfs:
+      - /run
+      - /run/lock
+      - /var/cache
+      - /tmp:exec

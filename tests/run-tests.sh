@@ -3,48 +3,59 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Initializations.
 ROOT="$(dirname "$(realpath "$0")")"
 TEMP="$(mktemp -d)"
 trap 'rm -rf "$TEMP"' EXIT
 
-# Prepare a base copy of VCL files with common tweaks:
-#   - Include 'akamai.vcl' (might be handy for some tests).
-#   - Use 'replication-disabled.vcl' as the replication option.
-cp -r "$ROOT/../vcl"/. "$TEMP/vcl/"
-sed -i \
-    -e 's/^# \(include "akamai.vcl";\)/\1/' \
-    -e 's/^\(include "replication-.*\.vcl"\);/# \1;/' \
-    -e "s/^# \(include \"replication-disabled.vcl\";\)/\1/" \
-    "$TEMP/vcl/main.vcl"
+compile-vcl() {
+    local output=$(mktemp)
+    if ! varnishd \
+        -C \
+        -f "$TEMP/vcl/main.vcl" \
+        -p "vcl_path=$TEMP/vcl:/usr/share/varnish-plus/vcl" \
+        >"$output" 2>&1; then
+        cat "$output"
+        exit 1
+    fi
+}
 
-# Discover VTC files to run.
-if [[ $# -gt 0 ]]; then
-    VTCS=("$@")
-else
-    mapfile -t VTCS < <(find "$ROOT" -name '*.vtc' -type f | sort)
-fi
+check-vcl-syntax() {
+    # Initializations.
+    local -a replications=(disabled vha cluster)
+    local -a environments=(local pro)
+    cp -r "$ROOT/../vcl"/. "$TEMP/vcl/"
 
-# Run VTC tests until the first failure is encountered. For each test, create a
-# per-test copy of the VCL files and only uncomment the instrumentation points
-# declared in the VTC file via the '# VTC_SUBS: sub1 sub2 ...' comment.
-for vtc in "${VTCS[@]}"; do
-    VCL_PATH="$TEMP/$(basename "$vtc" .vtc)/vcl"
-    TMP_PATH="$TEMP/$(basename "$vtc" .vtc)/tmp"
-
-    mkdir -p "$TMP_PATH" "$VCL_PATH"
-    cp -r "$TEMP/vcl"/. "$VCL_PATH"
-
-    mapfile -t VTC_SUBS < <(grep -oP '(?<=^# VTC_SUBS:)\s.*' "$vtc" | grep -oP '\S+' || true)
-    for sub in "${VTC_SUBS[@]}"; do
-        find "$VCL_PATH" -name '*.vcl' -exec \
-            sed -i \
-                -e "s/^\(\s*\)# \(call ${sub};\)$/\1\2/" \
-                {} +
+    # Check syntax including 'akamai.vcl' and one replication strategy at a
+    # time.
+    local replication
+    cp "$TEMP/vcl/main.vcl" "$TEMP/vcl/main.vcl.bak"
+    for replication in "${replications[@]}"; do
+        echo "  - replication-${replication}.vcl"
+        sed -i \
+            -e 's/^# \(include "akamai\.vcl";\)/\1/' \
+            -e 's/^\(include "replication-.*\.vcl"\);/# \1;/' \
+            -e "s/^# \(include \"replication-${replication}\.vcl\";\)/\1/" \
+            "$TEMP/vcl/main.vcl"
+        compile-vcl
     done
+    mv "$TEMP/vcl/main.vcl.bak" "$TEMP/vcl/main.vcl"
 
-    varnishtest \
-        -Dvcl_path="$VCL_PATH" \
-        -Dtmp_path="$TMP_PATH" \
-        "$vtc"
-done
+    # Check syntax including one environment at a time.
+    local environment
+    cp "$TEMP/vcl/environment.vcl" "$TEMP/vcl/environment.vcl.bak"
+    for environment in "${environments[@]}"; do
+        echo "  - environment-${environment}.vcl"
+        sed -i \
+            -e "s/^include \"environment-.*\.vcl\";/include \"environment-${environment}.vcl\";/" \
+            "$TEMP/vcl/environment.vcl"
+        compile-vcl
+    done
+    mv "$TEMP/vcl/environment.vcl.bak" "$TEMP/vcl/environment.vcl"
+}
+
+echo '> Checking VCL syntax...'
+check-vcl-syntax
+
+echo
+echo '> Running VTC tests...'
+"$ROOT/vtc/run-tests.sh"
