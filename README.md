@@ -228,7 +228,7 @@ Out of the box, **VCLSKi already showcases this approach by using the `environme
 
 Our preferred tool for automated testing is [`varnishtest`](https://www.varnish-software.com/developers/tutorials/testing-varnish-varnishtest/), although it is not always the best option for the kind of end-to-end testing most VCL setups need. Out of the box, **VCLSKi includes [some tests](tests/vtc/) that show a practical way to build this kind of testing on top of `varnishtest` with minimal impact on your VCL**.
 
-The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. Check the example VTC files for inspiration when creating your own.
+The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. **Check the example the `vtc/run-tests.sh` script and VTC files for inspiration when creating your own**. Alternative approaches like using [the Go SDK for Varnish](https://github.com/varnish/varnish-go) will be showcased in the future when they support Varnish Enterprise.
 </details>
 
 <details>
@@ -241,6 +241,8 @@ The whole approach assumes a single VCL that can adapt to multiple environments 
 <summary><strong>I want to contribute to VCLSKi. How can I help?</strong></summary><br/>
 
 This is our very opinionated take on a VCL starter kit, but we're always happy to hear ideas and contributions. If you spot an error, find a clearer way to explain something, or want to suggest a new feature, feel free to open an issue or submit a pull request. **We welcome any contribution that helps make VCLSKi better for everyone**.
+
+The project comes with a small Docker-based dev environment you can use. Take a look at the [Docker Compose](./docker-compose.yml) file and the [Dockerfile](./Dockerfile). The Docker Compose file also includes a tiny cheat sheet to get you started.
 </details>
 
 ## 📝 License
