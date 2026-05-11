@@ -12,6 +12,7 @@ compile-vcl() {
     if ! varnishd \
         -C \
         -f "$TEMP/vcl/main.vcl" \
+        -j none \
         -p "vcl_path=$TEMP/vcl:/usr/share/varnish-plus/vcl" \
         >"$output" 2>&1; then
         cat "$output"

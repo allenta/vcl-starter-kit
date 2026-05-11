@@ -46,5 +46,6 @@ for VTC in "${VTCS[@]}"; do
     varnishtest \
         -Dvcl_path="$VCL_PATH" \
         -Dtmp_path="$TMP_PATH" \
+        -Dvarnish_args="-j none -p vcl_path=$VCL_PATH:/usr/share/varnish-plus/vcl" \
         "$VTC"
 done

@@ -19,7 +19,7 @@ server s2 {
     txresp -status 500
 } -repeat 1 -start
 
-varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl+backend {
+varnish v1 -arg "${varnish_args}" -vcl+backend {
     include "main.vcl";
 
     # VCL patching.

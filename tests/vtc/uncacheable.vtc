@@ -24,7 +24,7 @@ server s1 {
         -hdr "X-Varnish-Uncacheable: hfp"
 } -repeat 1 -start
 
-varnish v1 -arg "-p vcl_path=${vcl_path}:/usr/share/varnish-plus/vcl" -vcl {
+varnish v1 -arg "${varnish_args}" -vcl {
     include "main.vcl";
 
     # VTC instrumentation subroutines (see 'run-tests.sh').
