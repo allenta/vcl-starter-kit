@@ -1,7 +1,7 @@
-FROM ubuntu:noble-20260410
+FROM ubuntu:resolute-20260421
 
-ENV VARNISH_VERSION=6.0.17r3-1~noble
-ENV GO_VERSION=1.25.1
+ENV VARNISH_VERSION=6.0.17r3-1~resolute
+ENV GO_VERSION=1.26.1
 
 ENV PATH=$PATH:/usr/local/go/bin
 
