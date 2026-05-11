@@ -8,7 +8,7 @@ TEMP="$(mktemp -d)"
 trap 'rm -rf "$TEMP"' EXIT
 
 compile-vcl() {
-    local output=$(mktemp)
+    local output="$TEMP/output"
     if ! varnishd \
         -C \
         -f "$TEMP/vcl/main.vcl" \
