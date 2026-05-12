@@ -230,7 +230,7 @@ Our preferred tool for automated testing is [`varnishtest`](https://www.varnish-
 
 The whole approach assumes a single VCL that can adapt to multiple environments (see the previous question), where testing is treated as just another environment. **Check the example the `vtc/run-tests.sh` script and VTC files for inspiration when creating your own**.
 
-Alternative approaches like using [the Go SDK for Varnish](https://github.com/varnish/varnish-go) will be showcased in the future when they support Varnish Enterprise.
+Alternative approaches work too. For example, you can use [the Go SDK for Varnish](https://github.com/varnish/varnish-go) to build a custom testing framework that fits your needs. **VCLSKi also includes [some tests](tests/go/) showing how to do this with the Go SDK for Varnish.** The core idea is the same as with `varnishtest`: treat testing as just another environment and enable instrumentation subroutines when you need them.
 </details>
 
 <details>
