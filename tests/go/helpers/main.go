@@ -3,29 +3,25 @@ package helpers
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path/filepath"
 )
 
-// vclRootFlag is registered by 'init()' and set via 'go test -args -vcl-root=<path>'.
+const (
+	LicensePathParameter = "/usr/share/varnish-plus/vtc-license.dat"
+	JailModeParameter    = "none"
+)
+
+// vclRootFlag is the path to the root directory of VCL files. The flag is
+// registered by 'init()' and set via 'go test -args -vcl-root=<path>'.
 var vclRootFlag = flag.String("vcl-root", "", "")
 
-// vclRoot returns the absolute path to the VCL files. It uses the '-vcl-root'
-// flag if provided, otherwise falls back to resolving relative to the current
-// working directory (assuming cwd is 'tests/go/').
-func vclRoot() string {
-	if *vclRootFlag != "" {
-		return *vclRootFlag
+func VCLRoot() string {
+	if *vclRootFlag == "" {
+		panic("required flag '-vcl-root' not set")
 	}
 
-	cwd, _ := os.Getwd()
-	dir, err := filepath.Abs(filepath.Join(cwd, "..", ".."))
-	if err != nil {
-		panic(err)
-	}
-	return dir
+	return *vclRootFlag
 }
 
-func VCLPathParameter() string {
-	return fmt.Sprintf("vcl_path=%s:/usr/share/varnish-plus/vcl", vclRoot())
+func VCLPathParameter(vclRoot string) string {
+	return fmt.Sprintf("vcl_path=%s:/usr/share/varnish-plus/vcl", vclRoot)
 }

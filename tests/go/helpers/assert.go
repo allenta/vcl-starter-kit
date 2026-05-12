@@ -9,6 +9,8 @@ import (
 )
 
 func AssertVarnishCounterValue(t *testing.T, varnish vtest.Varnish, name string, expectedValue uint64) {
+	t.Helper()
+
 	actualValue, err := varnish.CounterValue(name)
 	require.NoError(t, err, "reading '%s' counter", name)
 	assert.Equal(t, expectedValue, actualValue, "counter '%s'", name)

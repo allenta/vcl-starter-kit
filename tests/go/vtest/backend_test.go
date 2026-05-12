@@ -41,9 +41,9 @@ func TestBackend(t *testing.T) {
 	// Start Varnish instance.
 	varnish, err := vtest.
 		New().
-		Parameter("-L", "/usr/share/varnish-plus/vtc-license.dat").
-		Parameter("-j", "none").
-		Parameter("-p", helpers.VCLPathParameter()).
+		Parameter("-L", helpers.LicensePathParameter).
+		Parameter("-j", helpers.JailModeParameter).
+		Parameter("-p", helpers.VCLPathParameter(helpers.VCLRoot())).
 		Backend("default", backend.URL).
 		Vcl41().
 		VclString(vcl).
@@ -56,7 +56,7 @@ func TestBackend(t *testing.T) {
 	require.NoError(t, err)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Equal(t, expectedBody, string(body))
 	assert.Equal(t, expectedHeaderValue, resp.Header.Get(expectedHeaderName))
@@ -67,7 +67,7 @@ func TestBackend(t *testing.T) {
 	require.NoError(t, err)
 	body, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Equal(t, expectedBody, string(body))
 	assert.Equal(t, expectedHeaderValue, resp.Header.Get(expectedHeaderName))

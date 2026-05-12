@@ -20,4 +20,4 @@ go test \
     "$PACKAGES" \
     -run "$PATTERN" \
     -args \
-    -vcl-root="$(realpath "$ROOT/../..")"
+    -vcl-root="$(realpath "$ROOT/../../vcl")"

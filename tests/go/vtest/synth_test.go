@@ -29,9 +29,9 @@ func TestSynth(t *testing.T) {
 	// Start Varnish instance.
 	varnish, err := vtest.
 		New().
-		Parameter("-L", "/usr/share/varnish-plus/vtc-license.dat").
-		Parameter("-j", "none").
-		Parameter("-p", helpers.VCLPathParameter()).
+		Parameter("-L", helpers.LicensePathParameter).
+		Parameter("-j", helpers.JailModeParameter).
+		Parameter("-p", helpers.VCLPathParameter(helpers.VCLRoot())).
 		VCLVersion("").
 		VclString(vcl).
 		Start()
@@ -41,7 +41,7 @@ func TestSynth(t *testing.T) {
 	// Submit request.
 	resp, err := http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
 
 	// Check counters.
