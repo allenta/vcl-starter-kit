@@ -46,6 +46,7 @@ func Varnish(t *testing.T, opts VarnishOptions) *vtest.VarnishBuilder {
 
 // PrepareVCL copies the project VCL files into a temporary directory and
 // applies some tweaks:
+//   - Remove 'vcl 4.1;' line.
 //   - Uncomment 'include "akamai.vcl"'.
 //   - Force 'replication-disabled.vcl' as the replication strategy.
 //   - Uncomment 'call <sub>;' lines for enabled instrumentation subroutines.
