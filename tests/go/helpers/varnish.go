@@ -10,7 +10,7 @@ import (
 	"github.com/varnish/varnish-go/vtest"
 )
 
-type StartVarnishOptions struct {
+type VarnishOptions struct {
 	// VTCSubs lists instrumentation subroutine names to uncomment in VCL files
 	// (e.g., 'vtc_post_init_environment').
 	VTCSubs []string
@@ -27,24 +27,21 @@ type StartVarnishOptions struct {
 	TempDir string
 }
 
-// StartVarnish starts a Varnish instance configured for testing. The caller
-// must call varnish.Stop() when done.
-func StartVarnish(t *testing.T, opts StartVarnishOptions) vtest.Varnish {
+// Varnish creates a Varnish instance configured for testing.
+func Varnish(t *testing.T, opts VarnishOptions) *vtest.VarnishBuilder {
 	t.Helper()
 
 	vclDir := PrepareVCL(t, opts)
 
-	varnish, err := vtest.
+	builder := vtest.
 		New().
 		Parameter("-L", LicensePathParameter).
 		Parameter("-j", JailModeParameter).
 		Parameter("-p", VCLPathParameter(vclDir)).
-		VCLVersion("").
-		VclString(opts.VCL).
-		Start()
-	require.NoError(t, err, "starting Varnish")
+		Vcl41().
+		VclString(opts.VCL)
 
-	return varnish
+	return builder
 }
 
 // PrepareVCL copies the project VCL files into a temporary directory and
@@ -52,7 +49,7 @@ func StartVarnish(t *testing.T, opts StartVarnishOptions) vtest.Varnish {
 //   - Uncomment 'include "akamai.vcl"'.
 //   - Force 'replication-disabled.vcl' as the replication strategy.
 //   - Uncomment 'call <sub>;' lines for enabled instrumentation subroutines.
-func PrepareVCL(t *testing.T, opts StartVarnishOptions) string {
+func PrepareVCL(t *testing.T, opts VarnishOptions) string {
 	t.Helper()
 
 	// Create a temporary directory for this test's VCL files.
@@ -85,6 +82,11 @@ func patchMainVCL(path string) error {
 		return err
 	}
 	content := string(data)
+
+	// Remove 'vcl 4.1;' line.
+	content = regexp.
+		MustCompile(`(?m)^\s*vcl\s+4\.1;\s*$`).
+		ReplaceAllString(content, "")
 
 	// Uncomment 'include "akamai.vcl"'.
 	content = regexp.

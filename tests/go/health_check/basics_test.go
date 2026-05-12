@@ -26,7 +26,7 @@ func TestBasics(t *testing.T) {
 	defer backend.Close()
 
 	// Start Varnish instance.
-	varnish := helpers.StartVarnish(t, helpers.StartVarnishOptions{
+	varnish, err := helpers.Varnish(t, helpers.VarnishOptions{
 		VTCSubs: []string{
 			"vtc_post_init_environment",
 		},
@@ -38,7 +38,8 @@ func TestBasics(t *testing.T) {
 				environment.set("default-be", "%s");
 			}
 		`, backend.URL),
-	})
+	}).Start()
+	require.NoError(t, err)
 	defer varnish.Stop()
 
 	// Request '/foo': should be a cache miss.
