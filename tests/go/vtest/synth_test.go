@@ -26,15 +26,14 @@ func TestSynth(t *testing.T) {
 	`
 
 	// Start Varnish instance.
-	varnish, err := vtest.
+	varnish := vtest.
 		New().
 		SetLicensePath(helpers.LicensePath).
 		Parameter("-j", helpers.JailModeParameter).
 		Parameter("-p", helpers.VCLPathParameter(helpers.VCLRoot())).
 		VCLVersion("").
 		VclString(vcl).
-		Start()
-	require.NoError(t, err)
+		AssertStart(t)
 	defer varnish.Stop()
 
 	// Submit request.
@@ -44,6 +43,6 @@ func TestSynth(t *testing.T) {
 	assert.Equal(t, 200, resp.StatusCode)
 
 	// Check counters.
-	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.client_req", 1)
-	helpers.AssertVarnishCounterValue(t, varnish, "MGT.child_panic", 0)
+	varnish.Counter("MAIN.client_req").AssertEquals(t, 1)
+	varnish.Counter("MGT.child_panic").AssertEquals(t, 0)
 }

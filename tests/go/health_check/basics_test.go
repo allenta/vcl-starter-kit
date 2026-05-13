@@ -25,7 +25,7 @@ func TestBasics(t *testing.T) {
 	defer backend.Close()
 
 	// Start Varnish instance.
-	varnish, err := helpers.Varnish(t, helpers.VarnishOptions{
+	varnish := helpers.Varnish(t, helpers.VarnishOptions{
 		VTCSubs: []string{
 			"vtc_post_init_environment",
 		},
@@ -37,8 +37,7 @@ func TestBasics(t *testing.T) {
 				environment.set("default-be", "%s");
 			}
 		`, backend.URL),
-	}).Start()
-	require.NoError(t, err)
+	}).AssertStart(t)
 	defer varnish.Stop()
 
 	// Request '/foo': should be a cache miss.
@@ -62,6 +61,6 @@ func TestBasics(t *testing.T) {
 	assert.Equal(t, "synth synth", resp.Header.Get("X-Varnish-Cache"))
 
 	// Check counters.
-	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.client_req", 2)
-	helpers.AssertVarnishCounterValue(t, varnish, "MGT.child_panic", 0)
+	varnish.Counter("MAIN.client_req").AssertEquals(t, 2)
+	varnish.Counter("MGT.child_panic").AssertEquals(t, 0)
 }

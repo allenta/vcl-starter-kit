@@ -41,7 +41,7 @@ func TestBasics(t *testing.T) {
 	defer s2.Close()
 
 	// Start Varnish instance.
-	varnish, err := helpers.Varnish(t, helpers.VarnishOptions{
+	varnish := helpers.Varnish(t, helpers.VarnishOptions{
 		VTCSubs: []string{
 			"vtc_post_init_environment",
 			"vtc_post_init",
@@ -85,8 +85,7 @@ func TestBasics(t *testing.T) {
 					"1m");
 			}
 		`, s1.URL),
-	}).Backend("s1", s1.URL).Backend("s2", s2.URL).Start()
-	require.NoError(t, err)
+	}).Backend("s1", s1.URL).Backend("s2", s2.URL).AssertStart(t)
 	defer varnish.Stop()
 
 	// Initial request for a cacheable object (fetch s1#1 and fetch s2#1). Server
@@ -150,6 +149,6 @@ func TestBasics(t *testing.T) {
 	assert.Equal(t, "60.000", resp.Header.Get("X-Varnish-Debug-Grace"))
 
 	// Check counters.
-	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.client_req", 4)
-	helpers.AssertVarnishCounterValue(t, varnish, "MGT.child_panic", 0)
+	varnish.Counter("MAIN.client_req").AssertEquals(t, 4)
+	varnish.Counter("MGT.child_panic").AssertEquals(t, 0)
 }

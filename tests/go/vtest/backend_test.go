@@ -38,7 +38,7 @@ func TestBackend(t *testing.T) {
 	defer backend.Close()
 
 	// Start Varnish instance.
-	varnish, err := vtest.
+	varnish := vtest.
 		New().
 		SetLicensePath(helpers.LicensePath).
 		Parameter("-j", helpers.JailModeParameter).
@@ -46,8 +46,7 @@ func TestBackend(t *testing.T) {
 		Backend("default", backend.URL).
 		Vcl41().
 		VclString(vcl).
-		Start()
-	require.NoError(t, err)
+		AssertStart(t)
 	defer varnish.Stop()
 
 	// Submit first request: miss.
@@ -73,7 +72,7 @@ func TestBackend(t *testing.T) {
 	assert.Equal(t, "1", resp.Header.Get("X-Hits"))
 
 	// Check counters.
-	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.client_req", 2)
-	helpers.AssertVarnishCounterValue(t, varnish, "MGT.child_panic", 0)
-	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.cache_hit", 1)
+	varnish.Counter("MAIN.client_req").AssertEquals(t, 2)
+	varnish.Counter("MGT.child_panic").AssertEquals(t, 0)
+	varnish.Counter("MAIN.cache_hit").AssertEquals(t, 1)
 }
