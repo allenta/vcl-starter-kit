@@ -3,7 +3,6 @@ package vtest
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/allenta/vcl-starter-kit/tests/go/helpers"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,7 @@ func TestSynth(t *testing.T) {
 	// Start Varnish instance.
 	varnish, err := vtest.
 		New().
-		Parameter("-L", helpers.LicensePathParameter).
+		SetLicensePath(helpers.LicensePath).
 		Parameter("-j", helpers.JailModeParameter).
 		Parameter("-p", helpers.VCLPathParameter(helpers.VCLRoot())).
 		VCLVersion("").
@@ -45,7 +44,6 @@ func TestSynth(t *testing.T) {
 	assert.Equal(t, 200, resp.StatusCode)
 
 	// Check counters.
-	time.Sleep(100 * time.Millisecond) // XXX: better alternative?
 	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.client_req", 1)
 	helpers.AssertVarnishCounterValue(t, varnish, "MGT.child_panic", 0)
 }

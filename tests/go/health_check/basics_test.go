@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/allenta/vcl-starter-kit/tests/go/helpers"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +62,6 @@ func TestBasics(t *testing.T) {
 	assert.Equal(t, "synth synth", resp.Header.Get("X-Varnish-Cache"))
 
 	// Check counters.
-	time.Sleep(100 * time.Millisecond) // XXX: better alternative?
 	helpers.AssertVarnishCounterValue(t, varnish, "MAIN.client_req", 2)
 	helpers.AssertVarnishCounterValue(t, varnish, "MGT.child_panic", 0)
 }

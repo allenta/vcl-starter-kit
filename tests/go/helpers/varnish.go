@@ -35,7 +35,7 @@ func Varnish(t *testing.T, opts VarnishOptions) *vtest.VarnishBuilder {
 
 	builder := vtest.
 		New().
-		Parameter("-L", LicensePathParameter).
+		SetLicensePath(LicensePath).
 		Parameter("-j", JailModeParameter).
 		Parameter("-p", VCLPathParameter(vclDir)).
 		Vcl41().

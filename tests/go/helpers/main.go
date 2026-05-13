@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	LicensePathParameter = "/usr/share/varnish-plus/vtc-license.dat"
-	JailModeParameter    = "none"
+	LicensePath       = "/usr/share/varnish-plus/vtc-license.dat"
+	JailModeParameter = "none"
 )
 
 // vclRootFlag is the path to the root directory of VCL files. The flag is
