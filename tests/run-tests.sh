@@ -21,10 +21,22 @@ compile-vcl() {
 }
 
 check-vcl-syntax() {
-    # Initializations.
-    local -a replications=(disabled vha cluster)
-    local -a environments=(local pro)
+    # Copy VCL files to a temporary location.
     cp -r "$ROOT/../vcl"/. "$TEMP/vcl/"
+
+    # Discover existing replication and environment flavors.
+    local -a replications=()
+    mapfile -t replications < <(
+        find "$TEMP/vcl" -maxdepth 1 -type f -name 'replication-*.vcl' -printf '%f\n' \
+            | sed -E 's/^replication-(.*)\.vcl$/\1/' \
+            | sort
+    )
+    local -a environments=()
+    mapfile -t environments < <(
+        find "$TEMP/vcl" -maxdepth 1 -type f -name 'environment-*.vcl' -printf '%f\n' \
+            | sed -E 's/^environment-(.*)\.vcl$/\1/' \
+            | sort
+    )
 
     # Check syntax including 'akamai.vcl' and one replication strategy at a
     # time.
