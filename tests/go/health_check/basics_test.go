@@ -2,7 +2,6 @@ package health_check
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -43,21 +42,15 @@ func TestBasics(t *testing.T) {
 	// Request '/foo': should be a cache miss.
 	resp, err := http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Empty(t, body)
+	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "miss cached", resp.Header.Get("X-Varnish-Cache"))
 
 	// Request '/health-check/': should be a synthetic response.
 	resp, err = http.Get(varnish.URL + "/health-check/")
 	require.NoError(t, err)
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Empty(t, body)
+	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "synth synth", resp.Header.Get("X-Varnish-Cache"))
 
 	// Check counters.

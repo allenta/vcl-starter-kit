@@ -2,7 +2,6 @@ package vtest
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,22 +51,16 @@ func TestBackend(t *testing.T) {
 	// Submit first request: miss.
 	resp, err := http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Equal(t, expectedBody, string(body))
+	assert.Equal(t, expectedBody, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, expectedHeaderValue, resp.Header.Get(expectedHeaderName))
 	assert.Equal(t, "0", resp.Header.Get("X-Hits"))
 
 	// Submit second request: hit.
 	resp, err = http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Equal(t, expectedBody, string(body))
+	assert.Equal(t, expectedBody, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, expectedHeaderValue, resp.Header.Get(expectedHeaderName))
 	assert.Equal(t, "1", resp.Header.Get("X-Hits"))
 

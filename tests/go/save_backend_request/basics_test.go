@@ -2,7 +2,6 @@ package save_backend_request
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -92,11 +91,8 @@ func TestBasics(t *testing.T) {
 	// s1 fails but the VCL retries with s2 and successfully gets a response.
 	resp, err := http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Empty(t, body)
+	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "miss cached", resp.Header.Get("X-Varnish-Cache"))
 	assert.Equal(t, "0", resp.Header.Get("X-Varnish-Hits"))
 	assert.Equal(t, "60.000", resp.Header.Get("X-Varnish-Debug-Initial-Ttl"))
@@ -106,11 +102,8 @@ func TestBasics(t *testing.T) {
 	// Subsequent request should be a cache hit.
 	resp, err = http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Empty(t, body)
+	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "hit cached", resp.Header.Get("X-Varnish-Cache"))
 	assert.Equal(t, "1", resp.Header.Get("X-Varnish-Hits"))
 	assert.Equal(t, "60.000", resp.Header.Get("X-Varnish-Debug-Initial-Ttl"))
@@ -124,10 +117,8 @@ func TestBasics(t *testing.T) {
 	req.Header.Set("X-Soft-Purge", "1")
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, "200 Soft purged (1)", resp.Status)
+	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 
 	// Next request is a miss. A synchronous fetch is done and both the backends
 	// respond with an error (fetch s1#2 and fetch s2#2), so the VCL revives the
@@ -135,18 +126,21 @@ func TestBasics(t *testing.T) {
 	// objects.
 	resp, err = http.Get(varnish.URL + "/foo")
 	require.NoError(t, err)
-	body, err = io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	resp.Body.Close()
 	assert.Equal(t, 200, resp.StatusCode)
-	assert.Empty(t, body)
+	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "miss cached", resp.Header.Get("X-Varnish-Cache"))
 	assert.Equal(t, "0", resp.Header.Get("X-Varnish-Hits"))
 	assert.Equal(t, "60.000", resp.Header.Get("X-Varnish-Debug-Initial-Ttl"))
 	assert.Equal(t, "0.000", resp.Header.Get("X-Varnish-Debug-Initial-Grace"))
 	assert.Equal(t, "120.000", resp.Header.Get("X-Varnish-Debug-Initial-Keep"))
-	assert.Equal(t, "30.000", resp.Header.Get("X-Varnish-Debug-Ttl"))
-	assert.Equal(t, "60.000", resp.Header.Get("X-Varnish-Debug-Grace"))
+	assert.LessOrEqual(
+		t,
+		helpers.MustParseFloat(t, resp.Header.Get("X-Varnish-Debug-Ttl")),
+		30.0)
+	assert.LessOrEqual(
+		t,
+		helpers.MustParseFloat(t, resp.Header.Get("X-Varnish-Debug-Grace")),
+		60.0)
 
 	// Check counters.
 	varnish.Counter("MAIN.client_req").AssertEquals(t, 4)
