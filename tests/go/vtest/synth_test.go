@@ -6,7 +6,6 @@ import (
 
 	"github.com/allenta/vcl-starter-kit/tests/go/helpers"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/varnish/varnish-go/vtest"
 )
 
@@ -37,10 +36,9 @@ func TestSynth(t *testing.T) {
 	defer varnish.Stop()
 
 	// Submit request.
-	resp, err := http.Get(varnish.URL + "/foo")
-	require.NoError(t, err)
-	resp.Body.Close()
+	resp := helpers.MustRequest(t, http.MethodGet, varnish.URL+"/foo", nil, nil)
 	assert.Equal(t, 200, resp.StatusCode)
+	assert.NotEmpty(t, helpers.MustReadResponseBody(t, resp))
 
 	// Check counters.
 	varnish.Counter("MAIN.client_req").AssertEquals(t, 1)

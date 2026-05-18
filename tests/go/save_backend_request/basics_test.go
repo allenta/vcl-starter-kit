@@ -8,7 +8,6 @@ import (
 
 	"github.com/allenta/vcl-starter-kit/tests/go/helpers"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestBasics verifies the save backend request feature (retries + revive).
@@ -89,8 +88,7 @@ func TestBasics(t *testing.T) {
 
 	// Initial request for a cacheable object (fetch s1#1 and fetch s2#1). Server
 	// s1 fails but the VCL retries with s2 and successfully gets a response.
-	resp, err := http.Get(varnish.URL + "/foo")
-	require.NoError(t, err)
+	resp := helpers.MustRequest(t, http.MethodGet, varnish.URL+"/foo", nil, nil)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "miss cached", resp.Header.Get("X-Varnish-Cache"))
@@ -100,8 +98,7 @@ func TestBasics(t *testing.T) {
 	assert.Equal(t, "120.000", resp.Header.Get("X-Varnish-Debug-Initial-Keep"))
 
 	// Subsequent request should be a cache hit.
-	resp, err = http.Get(varnish.URL + "/foo")
-	require.NoError(t, err)
+	resp = helpers.MustRequest(t, http.MethodGet, varnish.URL+"/foo", nil, nil)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "hit cached", resp.Header.Get("X-Varnish-Cache"))
@@ -112,11 +109,10 @@ func TestBasics(t *testing.T) {
 
 	// Soft purge the content. The content's TTL goes to 0 but it is still kept
 	// in the cache because it has a keep time defined.
-	req, err := http.NewRequest(http.MethodGet, varnish.URL+"/foo", nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Soft-Purge", "1")
-	resp, err = http.DefaultClient.Do(req)
-	require.NoError(t, err)
+	headers := http.Header{
+		"X-Soft-Purge": []string{"1"},
+	}
+	resp = helpers.MustRequest(t, http.MethodGet, varnish.URL+"/foo", headers, nil)
 	assert.Equal(t, "200 Soft purged (1)", resp.Status)
 	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 
@@ -124,8 +120,7 @@ func TestBasics(t *testing.T) {
 	// respond with an error (fetch s1#2 and fetch s2#2), so the VCL revives the
 	// object and returns it with the configured TTL and grace for revived
 	// objects.
-	resp, err = http.Get(varnish.URL + "/foo")
-	require.NoError(t, err)
+	resp = helpers.MustRequest(t, http.MethodGet, varnish.URL+"/foo", nil, nil)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "miss cached", resp.Header.Get("X-Varnish-Cache"))

@@ -8,7 +8,6 @@ import (
 
 	"github.com/allenta/vcl-starter-kit/tests/go/helpers"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestBasics verifies the health-check URL returns a synthetic 200 response.
@@ -40,15 +39,13 @@ func TestBasics(t *testing.T) {
 	defer varnish.Stop()
 
 	// Request '/foo': should be a cache miss.
-	resp, err := http.Get(varnish.URL + "/foo")
-	require.NoError(t, err)
+	resp := helpers.MustRequest(t, http.MethodGet, varnish.URL+"/foo", nil, nil)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "miss cached", resp.Header.Get("X-Varnish-Cache"))
 
 	// Request '/health-check/': should be a synthetic response.
-	resp, err = http.Get(varnish.URL + "/health-check/")
-	require.NoError(t, err)
+	resp = helpers.MustRequest(t, http.MethodGet, varnish.URL+"/health-check/", nil, nil)
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Empty(t, helpers.MustReadResponseBody(t, resp))
 	assert.Equal(t, "synth synth", resp.Header.Get("X-Varnish-Cache"))
