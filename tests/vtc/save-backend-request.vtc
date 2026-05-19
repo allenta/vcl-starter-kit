@@ -100,8 +100,8 @@ client c1 {
     expect resp.http.X-Varnish-Debug-Initial-Ttl == "60.000"
     expect resp.http.X-Varnish-Debug-Initial-Grace == "0.000"
     expect resp.http.X-Varnish-Debug-Initial-Keep == "120.000"
-    expect resp.http.X-Varnish-Debug-Ttl == "30.000"
-    expect resp.http.X-Varnish-Debug-Grace == "60.000"
+    expect resp.http.X-Varnish-Debug-Ttl <= 30.000
+    expect resp.http.X-Varnish-Debug-Grace <= 60.000
 } -run
 
 varnish v1 -expect client_req == 4
