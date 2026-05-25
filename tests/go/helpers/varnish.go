@@ -59,7 +59,7 @@ func PrepareVCL(t *testing.T, opts VarnishOptions) string {
 	}
 
 	// Copy VCL tree.
-	err := copyDir(VCLRoot(), vclDir)
+	err := os.CopyFS(vclDir, os.DirFS(VCLRoot()))
 	require.NoError(t, err, "copying VCL files")
 
 	// Apply tweaks to 'main.vcl'.
@@ -141,41 +141,5 @@ func enableInstrumentationSubs(vclDir string, subs []string) error {
 		}
 
 		return nil
-	})
-}
-
-// copyDir recursively copies 'src' to 'dst'.
-func copyDir(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-
-		target := filepath.Join(dst, rel)
-
-		if d.IsDir() {
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
-			return os.MkdirAll(target, info.Mode())
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-
-		return os.WriteFile(target, data, info.Mode())
 	})
 }
