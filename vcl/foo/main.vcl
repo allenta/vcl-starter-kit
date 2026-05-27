@@ -83,7 +83,7 @@ sub vcl_recv {
                 # requests leaving this subroutine with a 'Cookie' header as
                 # uncacheable. If that's needed, 'req.http.X-Varnish-Uncacheable'
                 # must be set explicitly. For example, here is assumed 'PLATFORM'
-                # cookie is needed downstream to create variants.
+                # cookie is needed upstream to create variants.
                 } else {
                     call foo_recv_cleanup_cookies;
                 }

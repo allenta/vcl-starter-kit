@@ -101,7 +101,7 @@ The top-level VCL and the example routes in VCLSKi cover a **wide range of featu
     + `environment` (global scope): for environment-specific context. Great for making the VCL logic adapt to different environments without having separate configurations for each one.
 
   - **Synthetic endpoints** for health checks, metrics scraping, and more:
-    + `/health-check/`, for upstream health checks.
+    + `/health-check/`, for downstream health checks.
     + `/varnish/stats/json/` & `/varnish/stats/prometheus/`, to expose Varnish stats in JSON or Prometheus format using the [stat VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/stat/).
     + `/varnish/flush/`, to flush the whole cache using the [ykey VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/ykey/) and a wildcard Ykey.
 

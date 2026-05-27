@@ -460,7 +460,7 @@ sub vcl_synth {
     set req.http.X-Varnish-Debug-Cache = "synth synth";
 
     # Inject informational headers. These headers should be included in all
-    # responses, reaching both the upstream CDN and the client. Beware of
+    # responses, reaching both the downstream CDN and the client. Beware of
     # disclosing sensitive information here.
     set resp.http.X-Varnish-Cache = req.http.X-Varnish-Debug-Cache;
 
@@ -937,8 +937,8 @@ sub vcl_deliver {
         unset resp.http.Surrogate-Control;
         if (resp.http.Cache-Control) {
             headerplus.init(resp);
-            # TODO: 's-maxage' might be used by upstream CDNs; consider allowing
-            # it to be preserved in the response.
+            # TODO: 's-maxage' might be used by downstream CDNs; consider
+            # allowing it to be preserved in the response.
             headerplus.attr_delete("Cache-Control", "s-maxage");
             headerplus.attr_delete("Cache-Control", "stale-while-revalidate");
             headerplus.attr_delete("Cache-Control", "stale-if-error");
@@ -948,7 +948,7 @@ sub vcl_deliver {
 
     # Unless this is an internal self-routed cluster request, inject informational
     # headers. These headers should be included in all responses, reaching both
-    # the upstream CDN and the client. Beware of disclosing sensitive
+    # the downstream CDN and the client. Beware of disclosing sensitive
     # information here.
     # TODO: extend the list of informational headers as needed.
     if (!req.http.X-Cluster-Token) {
