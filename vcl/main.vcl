@@ -919,7 +919,7 @@ sub vcl_deliver {
     # not work because Varnish uses a copy of the 'last modified' value stored
     # as an object attribute. See:
     #   - https://github.com/varnish/varnish/blob/varnish-6.0.18/bin/varnishd/cache/cache_rfc2616.c#L307-L310.
-    if (!req.http.X-Cluster-Token && resp.http.X-Varnish-Esi && req.esi_level == 0) {
+    if (!req.http.X-Cluster-Token && obj.can_esi && resp.do_esi && req.esi_level == 0) {
         unset req.http.If-Modified-Since;
         unset req.http.If-None-Match;
     }
