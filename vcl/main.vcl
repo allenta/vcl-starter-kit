@@ -910,12 +910,15 @@ sub vcl_miss {
 }
 
 sub vcl_deliver {
-    # Remove incoming 'If-Modified-Since' and 'If-None-Match' headers in order
-    # to avoid 304 responses for top-level requests containing ESI fragments (in
-    # order to allow those fragments to be refreshed  properly in the client
-    # side). Beware removing 'resp.http.Last-Modified' and 'resp.http.ETag'
-    # headers won't work because Varnish uses internal copies of them to decide
-    # when to send 304 responses.
+    # Remove incoming 'If-Modified-Since' and 'If-None-Match' headers to avoid
+    # 304 responses for top-level requests containing ESI fragments. This allows
+    # those fragments to be properly refreshed on the client side. Note that
+    # removing 'resp.http.ETag' would have the same effect as removing
+    # 'req.http.If-None-Match' (preventing 304 responses), but removing
+    # 'resp.http.Last-Modified' instead of 'req.http.If-Modified-Since' would
+    # not work because Varnish uses a copy of the 'last modified' value stored
+    # as an object attribute. See:
+    #   - https://github.com/varnish/varnish/blob/varnish-6.0.18/bin/varnishd/cache/cache_rfc2616.c#L307-L310.
     if (resp.http.X-Varnish-Esi && req.esi_level == 0) {
         unset req.http.If-Modified-Since;
         unset req.http.If-None-Match;
