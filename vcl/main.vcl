@@ -32,11 +32,12 @@
 ##
 ##   - Ykeys:
 ##     - HEAD/GET/PUT/POST/PURGE method.
-##     - 'X-Ykeys' header (comma separated list of keys).
+##     - 'X-Ykeys' (comma separated list of keys) or 'X-Ykeys-Expression' header.
 ##
 ##   - Soft Ykeys:
 ##     - HEAD/GET/PUT/POST/PURGE method.
-##     - 'X-Soft-Ykeys' header (comma separated list of keys).
+##     - 'X-Soft-Ykeys' (comma separated list of keys) or 'X-Soft-Ykeys-Expression'
+##       header.
 ##
 ##   - Bans:
 ##     - HEAD/GET/PUT/POST/BAN method.
@@ -284,7 +285,8 @@ sub recv_execute_route_preflight {
 
     # Normalize invalidation methods.
     if (req.method == "PURGE") {
-        if (!req.http.X-Soft-Purge && !req.http.X-Ykeys && !req.http.X-Soft-Ykeys) {
+        if (!req.http.X-Soft-Purge && !req.http.X-Ykeys && !req.http.X-Ykeys-Expression &&
+            !req.http.X-Soft-Ykeys && !req.http.X-Soft-Ykeys-Expression) {
             set req.http.X-Purge = "1";
         }
         set req.method = "GET";
@@ -304,7 +306,9 @@ sub recv_execute_route_preflight {
     if ((req.method == "HEAD" || req.method == "GET" || req.method == "PUT" ||
         req.method == "POST") &&
         (req.http.X-Purge || req.http.X-Soft-Purge || req.http.X-Ykeys ||
-        req.http.X-Soft-Ykeys || req.http.X-Ban || req.http.X-Forced-Miss) &&
+        req.http.X-Ykeys-Expression || req.http.X-Soft-Ykeys ||
+        req.http.X-Soft-Ykeys-Expression || req.http.X-Ban ||
+        req.http.X-Forced-Miss) &&
         std.ip(req.http.X-Client-Ip, "0.0.0.0") ~ can_invalidate_acl) {
         set req.http.X-Varnish-Invalidation = "1";
     }
@@ -716,15 +720,23 @@ sub recv_handle_invalidation {
         return (hash);
 
     # Ykeys invalidations.
-    } elsif (req.http.X-Ykeys) {
+    } elsif (req.http.X-Ykeys || req.http.X-Ykeys-Expression) {
         ykey.namespace(config.get(req.http.X-Varnish-Route + ":ykeys-namespace"));
-        set req.http.X-Varnish-Npurged = ykey.purge_header(req.http.X-Ykeys);
+        if (req.http.X-Ykeys) {
+            set req.http.X-Varnish-Npurged = ykey.purge_header(req.http.X-Ykeys);
+        } else {
+            set req.http.X-Varnish-Npurged = ykey.purge_expr(req.http.X-Ykeys-Expression);
+        }
         return (synth(200, "Purged (" + req.http.X-Varnish-Npurged + ")"));
 
     # Soft Ykeys invalidations.
-    } elsif (req.http.X-Soft-Ykeys) {
+    } elsif (req.http.X-Soft-Ykeys || req.http.X-Soft-Ykeys-Expression) {
         ykey.namespace(config.get(req.http.X-Varnish-Route + ":ykeys-namespace"));
-        set req.http.X-Varnish-Npurged = ykey.purge_header(req.http.X-Soft-Ykeys, soft=true);
+        if (req.http.X-Soft-Ykeys) {
+            set req.http.X-Varnish-Npurged = ykey.purge_header(req.http.X-Soft-Ykeys, soft=true);
+        } else {
+            set req.http.X-Varnish-Npurged = ykey.purge_expr(req.http.X-Soft-Ykeys-Expression, soft=true);
+        }
         return (synth(200, "Soft purged (" + req.http.X-Varnish-Npurged + ")"));
 
     # Bans.

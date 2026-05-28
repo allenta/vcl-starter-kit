@@ -8,7 +8,7 @@ server s1 {
     txresp \
         -hdr "Cache-Control: max-age=60, stale-while-revalidate=10" \
         -hdr "X-Varnish-Ykeys: key1, key2"
-} -repeat 12 -start
+} -repeat 14 -start
 
 varnish v1 -arg "${varnish_args}" -vcl {
     include "main.vcl";
@@ -155,7 +155,7 @@ client c1 {
     # delay 1
 
     ##
-    ## Purge using ykeys.
+    ## Purge using Ykeys.
     ##
 
     # Purge using one of the Ykeys.
@@ -192,7 +192,42 @@ client c1 {
     expect resp.http.X-Varnish-Hits == 1
 
     ##
-    ## Soft purge using ykeys.
+    ## Purge using a Ykeys expression.
+    ##
+
+    # Purge using two Ykeys.
+    txreq -url "/" -hdr "X-Ykeys-Expression: key1 OR key3"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Purged (1)"
+
+    # Subsequent request should be a cache miss again (fetch #8).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # Purges with Ykeys in a different namespace should not affect the cached
+    # content.
+    txreq -url "/" -hdr "X-Ykeys-Expression: key1 OR key3" -hdr "X-Ykeys-Namespace: bar"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Purged (0)"
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Soft purge using Ykeys.
     ##
 
     # Soft purge using one of the Ykeys.
@@ -211,7 +246,30 @@ client c1 {
     expect resp.http.X-Varnish-Ykeys == "key1, key2"
     expect resp.http.X-Varnish-Hits == 2
 
-    # Wait for the bgfetch to complete (fetch #8).
+    # Wait for the bgfetch to complete (fetch #9).
+    delay 1
+
+    ##
+    ## Soft purge using a Ykeys expression.
+    ##
+
+    # Soft purge using two Ykeys.
+    txreq -url "/" -hdr "X-Soft-Ykeys-Expression: key1 OR key3"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Soft purged (1)"
+
+    # Subsequent request should be a cache hit (stale content, a bgfetch will
+    # be spawned).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Ykeys == "key1, key2"
+    expect resp.http.X-Varnish-Hits == 1
+
+    # Wait for the bgfetch to complete (fetch #10).
     delay 1
 
     ##
@@ -225,7 +283,7 @@ client c1 {
     expect resp.http.X-Varnish-Cache == "synth synth"
     expect resp.reason == "Ban added"
 
-    # Subsequent request should be a cache miss again (fetch #9).
+    # Subsequent request should be a cache miss again (fetch #11).
     txreq -url "/foo"
     rxresp
     expect resp.status == 200
@@ -240,7 +298,7 @@ client c1 {
     expect resp.http.X-Varnish-Cache == "synth synth"
     expect resp.reason == "Ban added"
 
-    # Subsequent request should be a cache miss again (fetch #10).
+    # Subsequent request should be a cache miss again (fetch #12).
     txreq -url "/foo"
     rxresp
     expect resp.status == 200
@@ -268,14 +326,14 @@ client c1 {
     ## Forced cache miss.
     ##
 
-    # A cache miss can be forced with the X-Forced-Miss header (fetch #11).
+    # A cache miss can be forced with the X-Forced-Miss header (fetch #13).
     txreq -url "/foo" -hdr "X-Forced-Miss: 1"
     rxresp
     expect resp.status == 200
     expect resp.http.X-Varnish-Cache == "miss cached"
     expect resp.http.X-Varnish-Hits == 0
 
-    # A cache miss can also be forced with the REFRESH method (fetch #12).
+    # A cache miss can also be forced with the REFRESH method (fetch #14).
     txreq -req "REFRESH" -url "/foo" -hdr "X-Forced-Miss: 1"
     rxresp
     expect resp.status == 200
@@ -287,12 +345,12 @@ client c1 {
     ##
 
     # If an invalidation secret is configured, any invalidation request without
-    # the propert token should be rejected.
+    # the proper token should be rejected.
     txreq -url "/" -req "PURGE" -hdr "X-Invalidation-Secret: s3cr3t"
     rxresp
     expect resp.status == 403
 } -run
 
-varnish v1 -expect client_req == 26
+varnish v1 -expect client_req == 32
 
 varnish v1 -expect MGT.child_panic == 0
