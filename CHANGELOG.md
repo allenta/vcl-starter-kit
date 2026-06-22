@@ -4,6 +4,7 @@
     + Upgrade to Go 1.26.3.
     + Improve condition used to identify ESI responses during `vcl_deliver`: `resp.http.X-Varnish-Esi` vs. `obj.can_esi && resp.do_esi`.
     + Add support for purging using compound-expressions of Ykeys (supported since 6.0.18r1).
+    + Add `route` query parameter to the Varnish flushing URL, allowing to target specific routes instead of flushing everything.
 
 - 2026.05.0 (2026-05-08):
     + Add proposal of a VTC-based end-to-end testing skeleton.

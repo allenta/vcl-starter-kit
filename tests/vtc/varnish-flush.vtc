@@ -1,0 +1,97 @@
+varnishtest "Test Varnish flush endpoint"
+
+# VTC_SUBS: vtc_post_init_environment
+
+server s1 {
+    rxreq
+    expect req.url == "/foo"
+    txresp -hdr "Cache-Control: max-age=60"
+} -repeat 3 -start
+
+varnish v1 -arg "${varnish_args}" -vcl {
+    include "main.vcl";
+
+    # VTC instrumentation subroutines (see 'run-tests.sh').
+
+    sub vtc_post_init_environment {
+        environment.set("default-be", "${s1_addr}:${s1_port}");
+    }
+} -start
+
+client c1 {
+    ##
+    ## Preamble.
+    ##
+
+    # Initial request for a cacheable object (fetch #1).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Flush everything.
+    ##
+
+    # Call endpoint.
+    txreq -req "POST" -url "/varnish/flush/"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Cache flushed (1)"
+
+    # Subsequent request should be a cache miss again (fetch #2).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+
+    ##
+    ## Flush 'bar' route.
+    ##
+
+    # Call endpoint.
+    txreq -req "POST" -url "/varnish/flush/?route=bar"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Cache flushed (0)"
+
+    # Subsequent request should be a cache hit.
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 1
+
+    ##
+    ## Flush 'foo' route.
+    ##
+
+    # Call endpoint.
+    txreq -req "POST" -url "/varnish/flush/?route=foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "synth synth"
+    expect resp.reason == "Cache flushed (1)"
+
+    # Subsequent request should be a cache miss again (fetch #3).
+    txreq -url "/foo"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish-Cache == "miss cached"
+    expect resp.http.X-Varnish-Hits == 0
+} -run
+
+varnish v1 -expect client_req == 8
+
+varnish v1 -expect MGT.child_panic == 0

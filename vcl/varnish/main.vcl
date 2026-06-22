@@ -36,7 +36,7 @@ sub vcl_recv {
             set req.http.X-Cluster-Skip = "true";
 
         # Flush URL.
-        } elsif (req.url == "/varnish/flush/") {
+        } elsif (req.url ~ "^/varnish/flush/(?:\?.*)?$") {
             # Check ACL.
             if (std.ip(req.http.X-Client-Ip, "0.0.0.0") !~ varnish_flush_acl) {
                 return (synth(403, "Not allowed"));
@@ -47,13 +47,23 @@ sub vcl_recv {
                 return (synth(405, "Method not allowed"));
             }
 
-            # Completely flush the cache using a Ykey assigned to all objects.
-            # Using a wildcard ban such as 'ban("obj.status != 0")' for lazy
-            # flushing is another option, but it is less robust due to the
-            # special VHA handling of bans (i.e., use 'vha.skip_ban()' to skip
-            # their evaluation during replication).
-            set req.http.X-Varnish-Npurged = ykey.purge_keys("varnish:everything");
-            return (synth(200, "Cache flushed (" + req.http.X-Varnish-Npurged + ")"));
+            # Decide Ykey to be invalidated.
+            set req.http.X-Varnish-Route-Route = urlplus.query_get("route", def="");
+            if (req.http.X-Varnish-Route-Route != "") {
+                set req.http.X-Varnish-Route-Ykey = "varnish:route:" + req.http.X-Varnish-Route-Route;
+            } else {
+                set req.http.X-Varnish-Route-Ykey = "varnish:everything";
+            }
+            unset req.http.X-Varnish-Route-Route;
+
+            # Flush the cache using the previously decided Ykey. Those Ykeys are
+            # assigned to all objects during 'v_b_r'. Using bans expressions
+            # such as 'ban("obj.status != 0")' for lazy flushing would be
+            # another option, but it is less robust due to the special VHA
+            # handling of bans (i.e., use 'vha.skip_ban()' to skip their
+            # evaluation during replication).
+            set req.http.X-Varnish-Route-Npurged = ykey.purge_keys(req.http.X-Varnish-Route-Ykey);
+            return (synth(200, "Cache flushed (" + req.http.X-Varnish-Route-Npurged + ")"));
 
         # Unknown URLs.
         } else {
