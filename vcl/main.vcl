@@ -21,35 +21,42 @@
 ## headers:
 ##
 ##   - Purges:
-##     - HEAD/GET/PUT/POST/PURGE method.
+##     - HEAD/GET/QUERY/PUT/POST/PURGE method.
 ##     - 'X-Purge' marker header (implicit for PURGE method).
 ##     - 'X-Refresh' marker header (optional).
 ##
 ##   - Soft purges:
-##     - HEAD/GET/PUT/POST/PURGE method.
+##     - HEAD/GET/QUERY/PUT/POST/PURGE method.
 ##     - 'X-Soft-Purge' marker header.
 ##     - 'X-Refresh' marker header (optional).
 ##
 ##   - Ykeys:
-##     - HEAD/GET/PUT/POST/PURGE method.
+##     - HEAD/GET/QUERY/PUT/POST/PURGE method.
 ##     - 'X-Ykeys' (comma separated list of keys) or 'X-Ykeys-Expression' header.
 ##
 ##   - Soft Ykeys:
-##     - HEAD/GET/PUT/POST/PURGE method.
+##     - HEAD/GET/QUERY/PUT/POST/PURGE method.
 ##     - 'X-Soft-Ykeys' (comma separated list of keys) or 'X-Soft-Ykeys-Expression'
 ##       header.
 ##
 ##   - Bans:
-##     - HEAD/GET/PUT/POST/BAN method.
+##     - HEAD/GET/QUERY/PUT/POST/BAN method.
 ##     - 'X-Ban' header (ban expression; defaults to current URL for BAN method).
 ##
 ##   - Forced cache misses:
-##     - HEAD/GET/PUT/POST/REFRESH method.
+##     - HEAD/GET/QUERY/PUT/POST/REFRESH method.
 ##     - 'X-Forced-Miss' marker header (implicit for REFRESH method).
 ##
 ## Basic cheat sheet:
 ##
-##   - varnishd -C -p "vcl_path=$PWD:/usr/share/varnish-plus/vcl" -f main.vcl
+##   - varnishd -p "vcl_path=$PWD:/usr/share/varnish-plus/vcl" -f main.vcl -C
+##
+##   - varnishd -p "vcl_path=$PWD:/usr/share/varnish-plus/vcl" -f main.vcl -F -n /tmp/v1 -i v1 -a 127.0.0.1:7001 -L /usr/share/varnish-plus/vtc-license.dat
+##     - NOW=$(date +"%Y%m%dT%H%M%S") && varnishadm -n /tmp/v1 vcl.load reload-$NOW main.vcl warm && varnishadm -n /tmp/v1 vcl.use reload-$NOW
+##     - varnishadm -n /tmp/v1 vcl.list
+##     - varnishlog -n /tmp/v1 -g request
+##     - varnishstat -n /tmp/v1 -1
+##     - curl -s http://127.0.0.1:7001/varnish/stats/prometheus/
 ##
 ##   - '/etc/varnish/maintenance' marker file enables maintenance mode. It
 ##     controls the response to 'GET /health-check/', used for upper layer
@@ -303,8 +310,8 @@ sub recv_execute_route_preflight {
     }
 
     # Enable invalidation mode?
-    if ((req.method == "HEAD" || req.method == "GET" || req.method == "PUT" ||
-        req.method == "POST") &&
+    if ((req.method == "HEAD" || req.method == "GET" || req.method == "QUERY" ||
+        req.method == "PUT" || req.method == "POST") &&
         (req.http.X-Purge || req.http.X-Soft-Purge || req.http.X-Ykeys ||
         req.http.X-Ykeys-Expression || req.http.X-Soft-Ykeys ||
         req.http.X-Soft-Ykeys-Expression || req.http.X-Ban ||
@@ -564,7 +571,8 @@ sub vcl_backend_fetch {
     # Announce ESI capability.
     set bereq.http.Surrogate-Capability = "key=ESI/1.0";
 
-    # Ensure the backend gets the right method when caching PUT & POST requests.
+    # Ensure the backend gets the right method when caching QUERY, PUT & POST
+    # requests.
     if (request.contains("X-Varnish-Bodyaccess-Method")) {
         set bereq.method = request.get("X-Varnish-Bodyaccess-Method");
     }
@@ -798,6 +806,7 @@ sub vcl_recv {
     # Non-RFC2616 or CONNECT which is weird.
     if (req.method != "GET" &&
         req.method != "HEAD" &&
+        req.method != "QUERY" &&
         req.method != "PUT" &&
         req.method != "POST" &&
         req.method != "TRACE" &&
@@ -815,7 +824,7 @@ sub vcl_recv {
     # Is this a uncacheable request? Beware presence of a 'Cookie' header won't
     # automatically make the request uncacheable (i.e., default built-in
     # behavior).
-    if ((req.method != "GET" && req.method != "HEAD" &&
+    if ((req.method != "GET" && req.method != "HEAD" && req.method != "QUERY" &&
          req.method != "PUT" && req.method != "POST") ||
         req.http.Authorization ||
         req.http.X-Varnish-Uncacheable ||
@@ -826,8 +835,8 @@ sub vcl_recv {
         return (pass);
     }
 
-    # Get ready to cache PUT & POST requests.
-    if (req.method == "PUT" || req.method == "POST") {
+    # Get ready to cache QUERY, PUT & POST requests.
+    if (req.method == "QUERY" || req.method == "PUT" || req.method == "POST") {
         std.cache_req_body(std.bytes(config.get(req.http.X-Varnish-Route + ":max-cacheable-body-size"), 32KB));
         if (bodyaccess.len_req_body() == -1) {
             # TODO: consider handling this case as an uncacheable request: set
@@ -844,9 +853,9 @@ sub vcl_recv {
 }
 
 sub vcl_hash {
-    # Extend the default hash to allow caching of PUT & POST requests. Note the
-    # else branch to avoid obscure bugs that might result in two different
-    # objects sharing the same caching key. Example:
+    # Extend the default hash to allow caching of QUERY, PUT & POST requests.
+    # Note the else branch to avoid obscure bugs that might result in two
+    # different objects sharing the same caching key. Example:
     #   - Cacheable GET request for URL X executing 'hash_data("PUT")' and
     #     'hash_data("foo")' in its route-specific 'vcl_hash', both values
     #     extracted from incoming cookies.

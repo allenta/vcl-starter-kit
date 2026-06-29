@@ -82,10 +82,10 @@ sub vcl_recv {
         set req.http.X-Cluster-Skip = "true";
     }
 
-    # Workaround for cacheable PUT & POST requests downgraded to GET during
-    # self-routing. The symmetric logic in 'v_b_f' in the top-level logic is not
-    # reached during self-routing, so we need to execute the method restoration
-    # when the self-routed request reaches the origin.
+    # Workaround for cacheable QUERY, PUT & POST requests downgraded to GET
+    # during self-routing. The symmetric logic in 'v_b_f' in the top-level logic
+    # is not reached during self-routing, so we need to execute the method
+    # restoration when the self-routed request reaches the origin.
     if (req.http.X-Cluster-Token && req.http.X-Varnish-Bodyaccess-Method) {
         set req.method = req.http.X-Varnish-Bodyaccess-Method;
     }

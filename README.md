@@ -94,7 +94,7 @@ VCLSKi shows off some of these best practices, but it's up to you to keep things
 
 The top-level VCL and the example routes in VCLSKi cover a **wide range of features and use cases**, including:
 
-  - **Global and per-route settings** powered by the [kvstore VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/kvstore/): flip on passthrough mode, set up HTTPS redirects, limit the size of cacheable PUT & POST requests, control backend retries, and more. VCLSKi's VCL sets up four kvstore objects:
+  - **Global and per-route settings** powered by the [kvstore VMOD](https://docs.varnish-software.com/varnish-enterprise/vmods/kvstore/): flip on passthrough mode, set up HTTPS redirects, limit the size of cacheable QUERY, PUT & POST requests, control backend retries, and more. VCLSKi's VCL sets up four kvstore objects:
     + `config` (global scope): for global and per-route settings.
     + `request` (request scope): for task-specific data. Useful to track state in backend tasks without leaking info to the origins via custom HTTP headers.
     + `counters` (global scope): for quick-and-dirty counters you can see in `varnishstat` and the stats endpoints in the `varnish` route.

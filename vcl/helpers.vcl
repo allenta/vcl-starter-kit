@@ -51,7 +51,9 @@ sub save_backend_request {
     # the backend was tagged as sick (i.e., 'vcl_backend_fetch').
 
     # Try to retry the backend request. If possible (i.e., retries are available,
-    # etc.) this will jump to 'vcl_backend_fetch' and won't return.
+    # etc.) this will jump to 'vcl_backend_fetch' and won't return. Beware non
+    # idempotent methods are only retried if not explicitly tagged as uncacheable
+    # during 'vcl_recv'.
     if (request.contains("X-Varnish-Bodyaccess-Method") ||
         (bereq.method != "PUT" && bereq.method != "POST")) {
         if (std.healthy(bereq.backend) &&

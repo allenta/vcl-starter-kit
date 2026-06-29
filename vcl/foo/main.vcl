@@ -87,12 +87,12 @@ sub vcl_recv {
                 } else {
                     call foo_recv_cleanup_cookies;
                 }
-            }
 
-            # Usually PUTs & POSTs are handled as uncacheable requests. If so, no
-            # need to worry about cleaning up cookies or additional normalizations.
-            # The top-level logic will simply handle this as a passed request.
-            if (req.method == "PUT" || req.method == "POST") {
+            # Usually QUERY, PUTs & POSTs are handled as uncacheable requests.
+            # If so, no need to worry about cleaning up cookies or additional.
+            # normalizations The top-level logic will simply handle this as a
+            # passed request.
+            } elsif (req.method == "QUERY" || req.method == "PUT" || req.method == "POST") {
                 set req.http.X-Varnish-Uncacheable = "1";
             }
         } else {

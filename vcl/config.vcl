@@ -99,8 +99,8 @@ sub init_route_config {
         config.get("route") + ":force-https",
         "0");
 
-    # Maximum size of request bodies that may be cached for PUT & POST requests
-    # (string valid for 'std.bytes()').
+    # Maximum size of request bodies that may be cached for QUERY, PUT & POST
+    # requests (string valid for 'std.bytes()').
     config.set(
         config.get("route") + ":max-cacheable-body-size",
         "64KB");
