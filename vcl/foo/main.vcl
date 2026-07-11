@@ -44,6 +44,9 @@ sub vcl_recv {
         #   - Override URL or 'Host' header values used for caching key generation
         #     (i.e., 'req.http.X-Varnish-Hash-Url' and 'req.http.X-Varnish-Hash-Host'
         #     headers).
+        #   - Include additional input (e.g., normalized cookie values) for the
+        #     caching key generation (i.e., 'req.http.X-Varnish-Hash-Extra'
+        #     header).
         #   - Add access control logic or security barriers.
         #   - Execute HTTP redirections (i.e., synth codes 701 & 702) or rewrite &
         #     restart the request.
@@ -123,6 +126,9 @@ sub vcl_hash {
         #   - Extend the default hash logic defining what makes a cacheable
         #     request unique. The same could be achieved with a 'Vary' header,
         #     which is usually preferred when purging cached objects.
+        #   - It's fine to use 'hash_data()' here, but using the
+        #     'req.http.X-Varnish-Hash-Extra' header integrates better with the
+        #     caching key debug facilities in the top-level logic.
     }
 }
 

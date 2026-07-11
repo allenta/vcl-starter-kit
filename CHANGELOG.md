@@ -6,6 +6,7 @@
     + Add support for purging using compound-expressions of Ykeys (supported since 6.0.18r1).
     + Add `route` query parameter to the Varnish flushing URL, allowing to target specific routes instead of flushing everything.
     + Add support for cacheable [QUERY](https://www.rfc-editor.org/info/rfc10008/) requests.
+    + Add `X-Varnish-Debug-Hash-Data` header mimicking Akamai's `X-Cache-Key`.
 
 - 2026.05.0 (2026-05-08):
     + Add proposal of a VTC-based end-to-end testing skeleton.
