@@ -4,7 +4,7 @@
      Do not hand-edit; regenerate instead. Every animated element is
      hidden by default and only revealed inside a keyframe, so renderers
      without CSS animation support fall back to the static diagram. */
-  .vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar {
+  .vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar, .vk-legend {
     opacity: 0;
     animation-duration: 12.5s;
     animation-iteration-count: infinite;
@@ -47,6 +47,16 @@
   @keyframes vk-bar {
     0%   { opacity: 0.75; transform: scaleX(0); }
     100% { opacity: 0.75; transform: scaleX(1); }
+  }
+  .vk-legend {
+    animation-name: vk-legend; animation-timing-function: ease-out;
+    transform-origin: 466.04px 395.06px; mix-blend-mode: multiply;
+  }
+  @keyframes vk-legend {
+    0%, 82.400%   { opacity: 0; transform: scaleX(0); }
+    82.800%        { opacity: 0.45; transform: scaleX(0); }
+    85.200%, 92.800%    { opacity: 0.45; transform: scaleX(1); }
+    98.400%, 100% { opacity: 0; transform: scaleX(1); }
   }
   .vk-cap-0 { animation-name: vk-cap-0; }
   .vk-cap-1 { animation-name: vk-cap-1; }
@@ -202,7 +212,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar { display: none; }
+    .vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar, .vk-legend { display: none; }
     .vk-obj { animation: none; opacity: 1; }
   }
 </style>
@@ -233,6 +243,7 @@
   <circle class="vk-pkt vk-flight-v1 vk-give-v1" r="4.08" fill="#fab005" fill-opacity="0.20" style="animation-delay: 0.170s"/>
   <circle class="vk-pkt vk-flight-v1 vk-give-v1" r="5.04" fill="#fab005" fill-opacity="0.40" style="animation-delay: 0.085s"/>
   <circle class="vk-pkt vk-flight-v1 vk-give-v1" r="6.0" fill="#fab005" stroke="#1e1e1e" stroke-width="1.5"/>
+  <rect class="vk-legend" x="466.04" y="385.31" width="174.58" height="19.5" rx="3" fill="#fab005"/>
   <line class="vk-track" x1="10" y1="558.0860848563734" x2="686.8" y2="558.0860848563734" stroke="#1e1e1e" stroke-width="2" stroke-linecap="round"/>
   <line class="vk-bar" x1="10" y1="558.0860848563734" x2="686.8" y2="558.0860848563734" stroke="#f08c00" stroke-width="2.5" stroke-linecap="round"/>
   <text class="vk-cap vk-cap-0" x="24" y="167" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13.5px" fill="#5c5c5c" text-anchor="start" letter-spacing="0.2" style="white-space: pre;">GET: client asks Varnish3</text>

@@ -88,7 +88,8 @@ EASE_LOCAL = 'cubic-bezier(0.4, 0, 0.2, 1)'
 EASE_HAUL = 'linear'
 
 # Every class that is animated, and therefore hidden when animation is off.
-ANIMATED = '.vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar'
+ANIMATED = ('.vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar, '
+            '.vk-legend')
 
 # The Excalifont face embedded by Excalidraw is subsetted down to just the
 # glyphs the diagram itself uses (32 of them: no 'b', 'd', 'f', 'k', 'm', 'y',
@@ -98,6 +99,7 @@ ANIMATED = '.vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar'
 CAPTION = {'x': 24, 'y': 167, 'size': 13.5, 'fill': '#5c5c5c',
            'font': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'}
 BLOB_CENTRE = (17.2, 16.8)  # the rotate() centre of every drawn object blob
+LEGEND_ALPHA = 0.45         # strength of the legend highlighter swipe
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +220,36 @@ def captions_svg(captions):
                       CAPTION['size'], CAPTION['fill'],
                       text.replace('&', '&amp;')))
     return ''.join(out)
+
+
+def legend_css(loop, span, hold, box):
+    """A highlighter swipe across the legend line the loop just demonstrated.
+
+    Box coordinates come from measuring the drawn text's bounding box, so the
+    swipe tracks the glyphs rather than a guessed rectangle.
+    """
+    x, y, w, h = box
+    t0, t1 = span
+    return '''  .vk-legend {
+    animation-name: vk-legend; animation-timing-function: ease-out;
+    transform-origin: %spx %spx; mix-blend-mode: multiply;
+  }
+  @keyframes vk-legend {
+    0%%, %s   { opacity: 0; transform: scaleX(0); }
+    %s        { opacity: %s; transform: scaleX(0); }
+    %s, %s    { opacity: %s; transform: scaleX(1); }
+    %s, 100%% { opacity: 0; transform: scaleX(1); }
+  }
+''' % (x, y + h / 2,
+       pct(loop, t0), pct(loop, t0 + 0.05), LEGEND_ALPHA,
+       pct(loop, t1), pct(loop, hold), LEGEND_ALPHA,
+       pct(loop, loop - 0.2))
+
+
+def legend_svg(box):
+    x, y, w, h = box
+    return ('  <rect class="vk-legend" x="%s" y="%s" width="%s" height="%s" '
+            'rx="3" fill="%s"/>\n' % (x, y, w, h, OBJECT_FILL))
 
 
 def progress_css(loop, y):
@@ -356,6 +388,14 @@ VHA_CANVAS_PAD = 16               # empty strip added below it
 VHA_PROGRESS_Y = VHA_CANVAS_H + VHA_CANVAS_PAD / 2
 VHA_WIDTH = 686.8
 
+# The legend line the loop demonstrates. Measured from the drawn text's
+# bounding box (x=471.04, width=164.58) and padded 5px each side so the swipe
+# overhangs the glyphs like a marker pen. The band runs from cap height to a
+# little below the baseline. Beware: measure with the font actually loaded
+# ('document.fonts.ready'), or Excalifont's metrics come out ~20px narrow.
+VHA_LEGEND = (466.04, 385.31, 174.58, 19.5)   # "Full replication"
+VHA_LEGEND_SWIPE = (10.3, 10.65)
+
 # Running commentary, one caption at a time. Kept short: these sit in the
 # empty band between the Client box and the cluster box.
 VHA_CAPTIONS = (
@@ -394,6 +434,7 @@ def vha_style():
         ('vk-give-v2', EASE_LOCAL), ('vk-give-v1', EASE_LOCAL),
     ]))
     css.append(progress_css(L, VHA_PROGRESS_Y))
+    css.append(legend_css(L, VHA_LEGEND_SWIPE, VHA_HOLD, VHA_LEGEND))
     css.append(captions_css(L, VHA_CAPTIONS))
     css.append('\n  /* Client and origin traffic, riding the drawn curve */\n')
     css.append(leg(L, 'vk-get', VHA_GET, VHA_START, VHA_V3))
@@ -452,6 +493,7 @@ def vha_packets():
     out.append(ring('vk-flight-v1 vk-pull-v1', OBJECT_FILL))
     out.append(disc('vk-flight-v2 vk-give-v2', r=6.0))
     out.append(disc('vk-flight-v1 vk-give-v1', r=6.0))
+    out.append(legend_svg(VHA_LEGEND))
     out.append(progress_svg(VHA_PROGRESS_Y, VHA_WIDTH))
     out.append(captions_svg(VHA_CAPTIONS))
     out.append('</g>\n')
@@ -498,6 +540,10 @@ CL_CANVAS_PAD = 16               # empty strip added below it
 CL_PROGRESS_Y = CL_CANVAS_H + CL_CANVAS_PAD / 2
 CL_WIDTH = 686.8
 
+# This setup is full replication, the first of the three legend lines.
+CL_LEGEND = (466.04, 375.04, 174.58, 19.5)    # "Full replication"
+CL_LEGEND_SWIPE = (9.0, 9.35)
+
 CL_CAPTIONS = (
     (0.4, 2.2, 'GET: client asks Varnish3'),
     (2.2, 3.9, 'Self-routing to Varnish2'),
@@ -522,6 +568,7 @@ def cluster_style():
         ('vk-route', EASE_LOCAL), ('vk-hand', EASE_LOCAL),
     ]))
     css.append(progress_css(L, CL_PROGRESS_Y))
+    css.append(legend_css(L, CL_LEGEND_SWIPE, CL_HOLD, CL_LEGEND))
     css.append(captions_css(L, CL_CAPTIONS))
     css.append('\n  /* The client asks Varnish3, which does not own the object */\n')
     css.append(leg(L, 'vk-get', CL_GET, CL_START, CL_V3))
@@ -553,6 +600,7 @@ def cluster_packets():
                  disc('vk-curve vk-deliver')):
         out.append('  ' + frag)
     out.append('  </g>\n')
+    out.append(legend_svg(CL_LEGEND))
     out.append(progress_svg(CL_PROGRESS_Y, CL_WIDTH))
     out.append(captions_svg(CL_CAPTIONS))
     out.append('</g>\n')
