@@ -133,39 +133,28 @@ client c1 {
     ## Soft purge + refresh.
     ##
 
-    # XXX: A bug currently in Varnish Enterprise affects this test, so for now,
-    # an alternative version is provided.
-
-    # Soft purge the content, with explicit refresh. The stale content should be
-    # served, but instead, Varnish decides this is a miss and does a synchronous
-    # fetch (fetch #6).
+    # Soft purge the content, with explicit refresh. The stale content is served
+    # while a bgfetch is spawned. Prior to 6.0.18r4, due to a bug, this was
+    # handled as a miss + synchronous fetch instead of a hit + bgfetch.
     txreq -url "/foo" -hdr "X-Soft-Purge: 1" -hdr "X-Refresh: 1"
     rxresp
-    expect resp.http.X-Varnish-Cache == "miss cached"
-    expect resp.http.X-Varnish-Hits == 0
+    expect resp.http.X-Varnish-Cache == "hit cached"
+    expect resp.http.X-Varnish-Hits == 2
 
-    # # Soft purge the content, with explicit refresh. The stale content is served
-    # # while a bgfetch is spawned.
-    # txreq -url "/foo" -hdr "X-Soft-Purge: 1" -hdr "X-Refresh: 1"
-    # rxresp
-    # expect resp.http.X-Varnish-Cache == "hit cached"
-    # expect resp.http.X-Varnish-Hits == 2
-
-    # # Wait for the bgfetch to complete (fetch #6).
-    # delay 1
+    # Wait for the bgfetch to complete (fetch #6).
+    delay 1
 
     ##
     ## Purge using Ykeys.
     ##
 
-    # Purge using one of the Ykeys.
+    # Purge using one of the Ykeys. Prior to 6.0.18r4, due to a bug (see 'Soft
+    # purge + refresh'), two objects were purged instead of one.
     txreq -url "/" -hdr "X-Ykeys: key1, key3"
     rxresp
     expect resp.status == 200
     expect resp.http.X-Varnish-Cache == "synth synth"
-    # XXX: This expect is also affected by the aforementioned bug (see "Soft
-    # purge + refresh). As for now, two objects are being purged instead of one.
-    expect resp.reason == "Purged (2)"
+    expect resp.reason == "Purged (1)"
 
     # Subsequent request should be a cache miss again (fetch #7).
     txreq -url "/foo"

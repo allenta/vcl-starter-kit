@@ -1,6 +1,6 @@
 FROM ubuntu:resolute-20260421
 
-ENV VARNISH_VERSION=6.0.18r3-1~resolute
+ENV VARNISH_VERSION=6.0.18r4-1~resolute
 ENV GO_VERSION=1.26.5
 
 ENV PATH=$PATH:/usr/local/go/bin
