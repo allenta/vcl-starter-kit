@@ -70,14 +70,34 @@ are percentages of a curve's arc length, so they must be recomputed too.
 """
 
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 FADE = 0.15               # opacity ramp in/out for every packet
+TRAIL_STEP = 0.085        # lag between a packet and each of its trail ghosts
 OBJECT_FILL = '#fab005'   # matches the drawn orange object
 SIGNAL = '#1971c2'        # matches the drawn cluster boundary
 INK = '#1e1e1e'
+
+# Easing carries meaning: a hop to a neighbouring node snaps and settles,
+# while the long haul to the origin grinds along at a constant rate.
+EASE_EDGE = 'ease-in-out'
+EASE_LOCAL = 'cubic-bezier(0.4, 0, 0.2, 1)'
+EASE_HAUL = 'linear'
+
+# Every class that is animated, and therefore hidden when animation is off.
+ANIMATED = '.vk-pkt, .vk-wave, .vk-glow, .vk-cap, .vk-track, .vk-bar'
+
+# The Excalifont face embedded by Excalidraw is subsetted down to just the
+# glyphs the diagram itself uses (32 of them: no 'b', 'd', 'f', 'k', 'm', 'y',
+# no capital M/I/S, no punctuation), so captions cannot be set in it without
+# silently falling back to a browser default. They are therefore styled as a
+# deliberate annotation layer instead of a failed handwriting match.
+CAPTION = {'x': 24, 'y': 167, 'size': 13.5, 'fill': '#5c5c5c',
+           'font': 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'}
+BLOB_CENTRE = (17.2, 16.8)  # the rotate() centre of every drawn object blob
 
 
 # ---------------------------------------------------------------------------
@@ -116,15 +136,33 @@ def kf_hold(loop, name, span, opacity=1.0):
        pct(loop, t1 + FADE))
 
 
-def kf_stored(loop, name, at, hold):
-    """Fade a cached object in, then out again as the loop resets."""
+def kf_stored(loop, name, at, hold, translate):
+    """Fade a cached object in with a spring, then out as the loop resets.
+
+    The drawn object carries its position as a 'transform' attribute, which a
+    CSS transform would replace outright, so the original translate is baked
+    back into every keyframe. Nothing sets 'transform' outside the keyframes,
+    which is what keeps the animation-off fallback pixel-identical.
+    """
+    tx, ty = translate.split()
+    cx, cy = BLOB_CENTRE
+
+    def at_scale(s):
+        return ('translate(%spx, %spx) translate(%spx, %spx) scale(%s) '
+                'translate(-%spx, -%spx)' % (tx, ty, cx, cy, s, cx, cy))
+
     return '''  @keyframes %s {
-    0%%, %s   { opacity: 0; }
-    %s, %s    { opacity: 1; }
-    %s, 100%% { opacity: 0; }
+    0%%, %s   { opacity: 0; transform: %s; }
+    %s        { opacity: 1; transform: %s; }
+    %s        { opacity: 1; transform: %s; }
+    %s, %s    { opacity: 1; transform: %s; }
+    %s, 100%% { opacity: 0; transform: %s; }
   }
-''' % (name, pct(loop, at), pct(loop, at + 0.3), pct(loop, hold),
-       pct(loop, loop - 0.2))
+''' % (name, pct(loop, at), at_scale(0.35),
+       pct(loop, at + 0.13), at_scale(1.22),
+       pct(loop, at + 0.26), at_scale(0.95),
+       pct(loop, at + 0.36), pct(loop, hold), at_scale(1),
+       pct(loop, loop - 0.2), at_scale(1))
 
 
 def leg(loop, name, span, frm, to):
@@ -138,28 +176,116 @@ def ring(cls, stroke, r=5.5):
             'stroke-width="2.5"/>\n' % (cls, r, stroke))
 
 
-def disc(cls, r=6.5):
-    """The object itself, in flight."""
-    return ('  <circle class="vk-pkt %s" r="%s" fill="%s" stroke="%s" '
-            'stroke-width="1.5"/>\n' % (cls, r, OBJECT_FILL, INK))
+def disc(cls, r=6.5, trail=2):
+    """The object itself in flight, with a short comet tail behind it.
+
+    The ghosts share the head's keyframes and simply run late, so they trace
+    exactly where it has just been. No extra timeline to keep in sync.
+    """
+    out = []
+    for i in range(trail, 0, -1):
+        out.append('  <circle class="vk-pkt %s" r="%.2f" fill="%s" '
+                   'fill-opacity="%.2f" style="animation-delay: %.3fs"/>\n'
+                   % (cls, r * (1 - 0.16 * i), OBJECT_FILL, 0.40 / i,
+                      TRAIL_STEP * i))
+    out.append('  <circle class="vk-pkt %s" r="%s" fill="%s" stroke="%s" '
+               'stroke-width="1.5"/>\n' % (cls, r, OBJECT_FILL, INK))
+    return ''.join(out)
 
 
-def preamble(loop, extra=''):
+def captions_css(loop, captions):
+    """Keyframes for the running commentary. One caption visible at a time."""
+    spans = sorted((c[0], c[1]) for c in captions)
+    for (_, end), (nxt, _) in zip(spans, spans[1:]):
+        if nxt < end:
+            sys.exit('captions overlap at %ss; they must run one at a time.' % nxt)
+    if spans[-1][1] > loop:
+        sys.exit('caption at %ss runs past the end of the loop.' % spans[-1][1])
+    css = [names_css(['vk-cap-%d' % i for i in range(len(captions))])]
+    for i, (t0, t1, _) in enumerate(captions):
+        css.append(kf_hold(loop, 'vk-cap-%d' % i, (t0, t1)))
+    return ''.join(css)
+
+
+def captions_svg(captions):
+    out = []
+    for i, (_, _, text) in enumerate(captions):
+        out.append('  <text class="vk-cap vk-cap-%d" x="%s" y="%s" '
+                   'font-family="%s" font-size="%spx" fill="%s" '
+                   'text-anchor="start" letter-spacing="0.2" '
+                   'style="white-space: pre;">%s</text>\n'
+                   % (i, CAPTION['x'], CAPTION['y'], CAPTION['font'],
+                      CAPTION['size'], CAPTION['fill'],
+                      text.replace('&', '&amp;')))
+    return ''.join(out)
+
+
+def progress_css(loop, y):
+    """A hairline showing where in the loop you are: it is a loop, not a clip."""
+    return '''  .vk-track { animation-name: vk-track; animation-timing-function: linear; }
+  .vk-bar { animation-name: vk-bar; animation-timing-function: linear;
+            transform-origin: 10px %spx; }
+  @keyframes vk-track { 0%%, 100%% { opacity: 0.25; } }
+  @keyframes vk-bar {
+    0%%   { opacity: 0.75; transform: scaleX(0); }
+    100%% { opacity: 0.75; transform: scaleX(1); }
+  }
+''' % y
+
+
+def extend_canvas(svg, height, pad):
+    """Grow the canvas downwards, giving the progress hairline breathing room.
+
+    The drawn diagram is untouched; this only adds empty space below it, so
+    the hairline sits in that strip instead of crowding the origin's cached
+    objects. Both the <svg> element and the white background <rect> carry the
+    height, and the viewBox has to grow with them.
+    """
+    grown = height + pad
+    tall = ' height="%s"' % height
+    if svg.count(tall) != 2:  # the <svg> element and the background <rect>
+        sys.exit('expected 2 height="%s" attributes, found %d.'
+                 % (height, svg.count(tall)))
+    svg = svg.replace(tall, ' height="%s"' % grown)
+
+    box = 'viewBox="0 0 %s %s"'
+    vb = re.search(r'viewBox="0 0 ([\d.]+) %s"' % re.escape(str(height)), svg)
+    if not vb:
+        sys.exit('could not find a viewBox of height %s.' % height)
+    return svg.replace(vb.group(0), box % (vb.group(1), grown))
+
+
+def progress_svg(y, x2):
+    return ('  <line class="vk-track" x1="10" y1="%s" x2="%s" y2="%s" '
+            'stroke="%s" stroke-width="2" stroke-linecap="round"/>\n'
+            '  <line class="vk-bar" x1="10" y1="%s" x2="%s" y2="%s" '
+            'stroke="%s" stroke-width="2.5" stroke-linecap="round"/>\n'
+            % (y, x2, y, INK, y, x2, y, '#f08c00'))
+
+
+def preamble(loop):
     return '''  /* VCLSKi: animation overlay generated by animate-diagrams.py.
      Do not hand-edit; regenerate instead. Every animated element is
      hidden by default and only revealed inside a keyframe, so renderers
      without CSS animation support fall back to the static diagram. */
-  .vk-pkt%s {
+  %s {
     opacity: 0;
     animation-duration: %ss;
     animation-iteration-count: infinite;
   }
-  .vk-pkt { animation-timing-function: ease-in-out; }
-%s''' % (extra, loop, '')
+  .vk-pkt { animation-timing-function: %s; }
+  .vk-cap { animation-timing-function: ease-in-out; }
+  .vk-obj { animation-timing-function: ease-out; }
+''' % (ANIMATED, loop, EASE_EDGE)
 
 
 def names_css(names):
     return ''.join('  .%s { animation-name: %s; }\n' % (n, n) for n in names)
+
+
+def easing_css(pairs):
+    return ''.join('  .%s { animation-timing-function: %s; }\n' % (n, e)
+                   for n, e in pairs)
 
 
 REDUCED_MOTION = '''
@@ -168,7 +294,7 @@ REDUCED_MOTION = '''
     .vk-obj { animation: none; opacity: 1; }
   }
 </style>
-'''
+''' % ANIMATED
 
 
 # ===========================================================================
@@ -225,11 +351,28 @@ VHA_GIVE_V1 = (9.2, 10.1)
 VHA_STORE_V2 = 9.5
 VHA_STORE_V1 = 10.1
 VHA_HOLD = 11.6
+VHA_CANVAS_H = 550.0860848563734  # height of the Excalidraw export
+VHA_CANVAS_PAD = 16               # empty strip added below it
+VHA_PROGRESS_Y = VHA_CANVAS_H + VHA_CANVAS_PAD / 2
+VHA_WIDTH = 686.8
+
+# Running commentary, one caption at a time. Kept short: these sit in the
+# empty band between the Client box and the cluster box.
+VHA_CAPTIONS = (
+    (0.4, 2.0, 'GET: client asks Varnish3'),
+    (2.0, 2.6, 'MISS on Varnish3'),
+    (2.6, 4.2, 'Fetching from the origin'),
+    (4.2, 5.8, 'Origin responds'),
+    (5.8, 6.3, 'Varnish3 caches the object'),
+    (6.3, 7.9, 'Answers client, notifies peers'),
+    (7.9, 8.8, 'Peers pull it from Varnish3'),
+    (8.8, 10.1, 'Copying to Varnish1 & Varnish2'),
+)
 
 
 def vha_style():
     L = VHA_LOOP
-    css = ['<style class="vclski-animation">\n', preamble(L, ', .vk-wave, .vk-glow')]
+    css = ['<style class="vclski-animation">\n', preamble(L)]
     css.append('''  .vk-wave, .vk-glow { animation-timing-function: ease-out; }
   .vk-wave { transform-origin: %spx %spx; }
   .vk-curve { offset-path: path("%s"); }
@@ -245,6 +388,13 @@ def vha_style():
         ['vk-get', 'vk-miss', 'vk-fill', 'vk-deliver', 'vk-pull-v2',
          'vk-pull-v1', 'vk-give-v2', 'vk-give-v1', 'vk-glow-v2', 'vk-glow-v1']
         + ['vk-wave-%d' % i for i in range(len(VHA_WAVES))]))
+    css.append(easing_css([
+        ('vk-miss', EASE_HAUL), ('vk-fill', EASE_HAUL),
+        ('vk-pull-v2', EASE_LOCAL), ('vk-pull-v1', EASE_LOCAL),
+        ('vk-give-v2', EASE_LOCAL), ('vk-give-v1', EASE_LOCAL),
+    ]))
+    css.append(progress_css(L, VHA_PROGRESS_Y))
+    css.append(captions_css(L, VHA_CAPTIONS))
     css.append('\n  /* Client and origin traffic, riding the drawn curve */\n')
     css.append(leg(L, 'vk-get', VHA_GET, VHA_START, VHA_V3))
     css.append(leg(L, 'vk-miss', VHA_MISS, VHA_V3, VHA_ORIGIN))
@@ -263,11 +413,12 @@ def vha_style():
     css.append('  /* ...and it flies back to each of them */\n')
     css.append(leg(L, 'vk-give-v2', VHA_GIVE_V2, 100, 0))
     css.append(leg(L, 'vk-give-v1', VHA_GIVE_V1, 100, 0))
-    css.append('  /* Cached copies of the orange object */\n')
-    for name, at in (('vk-store-v3', VHA_STORE_V3), ('vk-store-v2', VHA_STORE_V2),
-                     ('vk-store-v1', VHA_STORE_V1)):
-        css.append(kf_stored(L, name, at, VHA_HOLD))
-    css.append(REDUCED_MOTION % '.vk-pkt, .vk-wave, .vk-glow')
+    css.append('  /* Cached copies of the orange object, landing with a spring */\n')
+    at_by_class = {'vk-store-v3': VHA_STORE_V3, 'vk-store-v2': VHA_STORE_V2,
+                   'vk-store-v1': VHA_STORE_V1}
+    for translate, cls in VHA_OBJECTS.items():
+        css.append(kf_stored(L, cls, at_by_class[cls], VHA_HOLD, translate))
+    css.append(REDUCED_MOTION)
     return ''.join(css)
 
 
@@ -301,6 +452,8 @@ def vha_packets():
     out.append(ring('vk-flight-v1 vk-pull-v1', OBJECT_FILL))
     out.append(disc('vk-flight-v2 vk-give-v2', r=6.0))
     out.append(disc('vk-flight-v1 vk-give-v1', r=6.0))
+    out.append(progress_svg(VHA_PROGRESS_Y, VHA_WIDTH))
+    out.append(captions_svg(VHA_CAPTIONS))
     out.append('</g>\n')
     return ''.join(out)
 
@@ -340,6 +493,19 @@ CL_HAND = (7.4, 8.8)      # Varnish2 -> Varnish3
 CL_STORE_V3 = 8.8         # Varnish3 caches it too
 CL_DELIVER = (9.2, 10.6)  # Varnish3 -> Client
 CL_HOLD = 11.4
+CL_CANVAS_H = 550.8861336844984  # height of the Excalidraw export
+CL_CANVAS_PAD = 16               # empty strip added below it
+CL_PROGRESS_Y = CL_CANVAS_H + CL_CANVAS_PAD / 2
+CL_WIDTH = 686.8
+
+CL_CAPTIONS = (
+    (0.4, 2.2, 'GET: client asks Varnish3'),
+    (2.2, 3.9, 'Self-routing to Varnish2'),
+    (3.9, 5.6, 'MISS: fetching from the origin'),
+    (5.6, 7.2, 'Origin responds to Varnish2'),
+    (7.2, 8.9, 'Varnish2 caches it, hands it on'),
+    (8.9, 10.7, 'Varnish3 caches it, answers client'),
+)
 
 
 def cluster_style():
@@ -351,6 +517,12 @@ def cluster_style():
 ''' % (CL_CURVE, L))
     css.append(names_css(['vk-get', 'vk-route', 'vk-miss', 'vk-fill',
                           'vk-hand', 'vk-deliver']))
+    css.append(easing_css([
+        ('vk-miss', EASE_HAUL), ('vk-fill', EASE_HAUL),
+        ('vk-route', EASE_LOCAL), ('vk-hand', EASE_LOCAL),
+    ]))
+    css.append(progress_css(L, CL_PROGRESS_Y))
+    css.append(captions_css(L, CL_CAPTIONS))
     css.append('\n  /* The client asks Varnish3, which does not own the object */\n')
     css.append(leg(L, 'vk-get', CL_GET, CL_START, CL_V3))
     css.append('  /* ...so it self-routes the request to Varnish2, which owns it */\n')
@@ -363,10 +535,11 @@ def cluster_style():
     css.append(leg(L, 'vk-hand', CL_HAND, CL_V2, CL_V3))
     css.append('  /* ...and Varnish3 answers the client */\n')
     css.append(leg(L, 'vk-deliver', CL_DELIVER, CL_V3, CL_CLIENT))
-    css.append('  /* Cached copies of the orange object */\n')
-    css.append(kf_stored(L, 'vk-store-v2', CL_STORE_V2, CL_HOLD))
-    css.append(kf_stored(L, 'vk-store-v3', CL_STORE_V3, CL_HOLD))
-    css.append(REDUCED_MOTION % '.vk-pkt')
+    css.append('  /* Cached copies of the orange object, landing with a spring */\n')
+    at_by_class = {'vk-store-v2': CL_STORE_V2, 'vk-store-v3': CL_STORE_V3}
+    for translate, cls in CL_OBJECTS.items():
+        css.append(kf_stored(L, cls, at_by_class[cls], CL_HOLD, translate))
+    css.append(REDUCED_MOTION)
     return ''.join(css)
 
 
@@ -379,7 +552,10 @@ def cluster_packets():
                  disc('vk-curve vk-hand'),
                  disc('vk-curve vk-deliver')):
         out.append('  ' + frag)
-    out.append('  </g>\n</g>\n')
+    out.append('  </g>\n')
+    out.append(progress_svg(CL_PROGRESS_Y, CL_WIDTH))
+    out.append(captions_svg(CL_CAPTIONS))
+    out.append('</g>\n')
     return ''.join(out)
 
 
@@ -387,7 +563,14 @@ def cluster_packets():
 # Patching
 # ===========================================================================
 
-def patch(name, style, packets, objects, checks, extra_defs=''):
+def accessible_names(title, desc):
+    """An accessible name and description for the diagram."""
+    return ('<title>%s</title><desc>%s</desc>'
+            % (title, desc.replace('&', '&amp;')))
+
+
+def patch(name, style, packets, objects, checks, extra_defs='', a11y=None,
+          canvas=None):
     source = os.path.join(HERE, '%s-static.svg' % name)
     target = os.path.join(HERE, '%s.svg' % name)
     with open(source, encoding='utf-8') as f:
@@ -404,6 +587,17 @@ def patch(name, style, packets, objects, checks, extra_defs=''):
 
     expect('</defs>', 'defs block')
     svg = svg.replace('</defs>', style() + extra_defs + '</defs>')
+
+    if canvas:
+        svg = extend_canvas(svg, *canvas)
+
+    if a11y:
+        # Give the diagram an accessible name. Neither element renders, so the
+        # animation-off fallback stays pixel-identical to the static export.
+        head = svg.index('>', svg.index('<svg '))
+        svg = svg[:head] + ' role="img"' + svg[head:]
+        head = svg.index('>', svg.index('<svg ')) + 1
+        svg = svg[:head] + accessible_names(*a11y) + svg[head:]
 
     for translate, cls in objects.items():
         needle = '<g stroke-linecap="round" transform="translate(%s)' % translate
@@ -430,9 +624,19 @@ if __name__ == '__main__':
         ('transform="%s rotate' % VHA_CURVE_GROUP, 'GET annotation group', 3),
         ('transform="translate(%s %s)' % (VHA_CLUSTER_BOX[0], VHA_CLUSTER_BOX[1]),
          'VHA cluster box', 1),
-    ], extra_defs=vha_defs())
+    ], extra_defs=vha_defs(), canvas=(VHA_CANVAS_H, VHA_CANVAS_PAD), a11y=(
+        'VHA replication',
+        'A client GET misses on Varnish3, which fetches the object from the '
+        'origin, caches it and answers the client, then broadcasts a '
+        'notification to its peers. Varnish1 and Varnish2 pull the object '
+        'straight from Varnish3 and cache it, reaching full replication.'))
 
     patch('replication-cluster', cluster_style, cluster_packets, CL_OBJECTS, checks=[
         ('d="%s"' % CL_CURVE, 'GET annotation curve', 1),
         ('transform="%s rotate' % CL_CURVE_GROUP, 'GET annotation group', 3),
-    ])
+    ], canvas=(CL_CANVAS_H, CL_CANVAS_PAD), a11y=(
+        'Varnish Cluster replication',
+        'Nothing is cached yet. A client GET reaches Varnish3, which does not '
+        'own the object, so it self-routes the request to Varnish2. Varnish2 '
+        'misses, fetches from the origin and caches the object, then hands it '
+        'to Varnish3, which caches it too and answers the client.'))
