@@ -22,6 +22,7 @@ func VCLRoot() string {
 	return *vclRootFlag
 }
 
+// VCLPathParameter returns the value of the 'vcl_path' varnishd parameter.
 func VCLPathParameter(vclRoot string) string {
-	return fmt.Sprintf("vcl_path=%s:/usr/share/varnish-plus/vcl", vclRoot)
+	return fmt.Sprintf("%s:/usr/share/varnish-plus/vcl", vclRoot)
 }

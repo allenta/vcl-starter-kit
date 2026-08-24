@@ -28,8 +28,8 @@ func TestSynth(t *testing.T) {
 	varnish := vtest.
 		New().
 		SetLicensePath(helpers.LicensePath).
-		Parameter("-j", helpers.JailModeParameter).
-		Parameter("-p", helpers.VCLPathParameter(helpers.VCLRoot())).
+		Jail(helpers.JailModeParameter).
+		Parameter("vcl_path", helpers.VCLPathParameter(helpers.VCLRoot())).
 		VCLVersion("").
 		VclString(vcl).
 		AssertStart(t)

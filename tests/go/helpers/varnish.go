@@ -28,7 +28,7 @@ type VarnishOptions struct {
 }
 
 // Varnish creates a Varnish instance configured for testing.
-func Varnish(t *testing.T, opts VarnishOptions) *vtest.VarnishBuilder {
+func Varnish(t *testing.T, opts VarnishOptions) *vtest.VarnishTestBuilder {
 	t.Helper()
 
 	vclDir := PrepareVCL(t, opts)
@@ -36,8 +36,8 @@ func Varnish(t *testing.T, opts VarnishOptions) *vtest.VarnishBuilder {
 	builder := vtest.
 		New().
 		SetLicensePath(LicensePath).
-		Parameter("-j", JailModeParameter).
-		Parameter("-p", VCLPathParameter(vclDir)).
+		Jail(JailModeParameter).
+		Parameter("vcl_path", VCLPathParameter(vclDir)).
 		Vcl41().
 		VclString(opts.VCL)
 

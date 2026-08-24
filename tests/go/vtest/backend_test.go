@@ -39,8 +39,8 @@ func TestBackend(t *testing.T) {
 	varnish := vtest.
 		New().
 		SetLicensePath(helpers.LicensePath).
-		Parameter("-j", helpers.JailModeParameter).
-		Parameter("-p", helpers.VCLPathParameter(helpers.VCLRoot())).
+		Jail(helpers.JailModeParameter).
+		Parameter("vcl_path", helpers.VCLPathParameter(helpers.VCLRoot())).
 		Backend("default", backend.URL).
 		Vcl41().
 		VclString(vcl).
