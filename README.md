@@ -72,11 +72,11 @@ When you use VCLSKi in more than one Varnish Enterprise server, you have **three
 
   - **[`replication-vha.vcl`](vcl/replication-vha.vcl)**: enables replication using [Varnish High Availability (VHA)](https://docs.varnish-software.com/varnish-high-availability/). It's a solid choice if you want basic cache syncing between nodes.
 
-    ![main.vcl](extras/assets/replication-vha.svg)
+    ![VHA replication](extras/assets/replication-vha.svg)
 
   - **[`replication-cluster.vcl`](vcl/replication-cluster.vcl)**: uses [Varnish Cluster](https://docs.varnish-software.com/varnish-enterprise/features/cluster/) for replication. This is usually the best option for most setups, as it offers more advanced features, but it can be a bit trickier to debug compared to VHA.
 
-    ![main.vcl](extras/assets/replication-cluster.svg)
+    ![Varnish Cluster replication](extras/assets/replication-cluster.svg)
 
 Pick the one that fits your needs, follow specific setup instructions for the solution of your choice if doing any replication at all (for VHA, [here](https://docs.varnish-software.com/varnish-high-availability/installation/); for Varnish Cluster, [here](https://docs.varnish-software.com/varnish-enterprise/features/cluster/#getting-started)), and then include VCLSKi's corresponding VCL in `main.vcl` to make your configuration replication-friendly.
 
