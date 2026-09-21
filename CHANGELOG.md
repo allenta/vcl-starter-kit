@@ -1,5 +1,6 @@
 - ?
     + Upgrade to Varnish Enterprise 6.0.18r5.
+    + Upgrade to Go 1.27.1.
 
 - 2026.08.0 (2026-08-24):
     + Add proposal of a Go-based end-to-end testing skeleton.
