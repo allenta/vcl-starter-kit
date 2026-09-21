@@ -853,6 +853,12 @@ sub vcl_recv {
         }
     }
 
+    # Introduced as built-in VCL since Varnish Enterprise 6.0.18r5 in order to
+    # honor RFC 9110.
+    if (req.method != "GET") {
+        unset req.http.Range;
+    }
+
     # Perform lookup. Beware the previous logic mimics the built-in 'vcl_recv'
     # behavior, so it is safe to assume 'return (hash)' here.
     return (hash);
@@ -959,6 +965,13 @@ sub vcl_miss {
 }
 
 sub vcl_deliver {
+    # Introduced as built-in VCL since Varnish Enterprise 6.0.18r5 in order to
+    # honor RFC 9112.
+    if (req.proto ~ "^(?i)HTTP/1.0" && req.esi_level == 0 &&
+        resp.http.Connection !~ "(?i)keep-alive") {
+        set resp.http.Connection = "close";
+    }
+
     # Remove incoming 'If-Modified-Since' and 'If-None-Match' headers to avoid
     # 304 responses for top-level requests containing ESI fragments. This allows
     # those fragments to be properly refreshed on the client side. Note that
@@ -1107,6 +1120,12 @@ sub vcl_backend_response {
         counters.counter("beresp-4xx", 1, varnishstat=true);
     } elsif (beresp.status >= 500 && beresp.status < 600) {
         counters.counter("beresp-5xx", 1, varnishstat=true);
+    }
+
+    # Introduced as built-in VCL since Varnish Enterprise 6.0.18r5 in order to
+    # honor RFC 9112.
+    if (beresp.proto ~ "^(?i)HTTP/1.0" && beresp.http.Transfer-Encoding) {
+        return (abandon);
     }
 
     # Skip passed (i.e., passed and hit-for-pass) requests.
