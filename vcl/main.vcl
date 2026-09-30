@@ -492,6 +492,13 @@ sub vcl_synth {
         return (deliver);
     }
 
+    # Introduced as built-in VCL since Varnish Enterprise 6.0.18r5 in order to
+    # honor RFC 9112.
+    if (req.proto ~ "^(?i)HTTP/1.0" && req.esi_level == 0 &&
+        resp.http.Connection !~ "(?i)keep-alive") {
+        set resp.http.Connection = "close";
+    }
+
     # Handle synthetic responses below 600 not reaching route's 'vcl_synth'
     # subroutine. Beware route might be unknown at this point.
     if (resp.status < 600 && (
