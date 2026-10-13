@@ -1,5 +1,5 @@
 - ?
-    + Upgrade to Varnish Enterprise 6.0.18r5.
+    + Upgrade to Varnish Enterprise 6.0.18r6.
     + Upgrade to Go 1.27.1.
     + Sync with built-in VCL changes in Varnish Enterprise 6.0.18r5.
 
