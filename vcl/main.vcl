@@ -1238,6 +1238,14 @@ sub vcl_backend_error {
     #
     #   - We include a marker header in order to convert this dummy object
     #     in a user friendly error page during 'vcl_synth'.
+    #
+    #   - HFM as an alternative to the short lived synthetic object: trying to
+    #     create a HFM object here (i.e., 'beresp.uncacheable') won't work as
+    #     expected. VCL will compile, but Varnish will ignore it and a regular
+    #     object will be cached instead. Even if it worked, request coalescing
+    #     would be lost until a good response replaces the HFM: every request
+    #     would hit the failing backend. Instead, adjust TTL & grace according
+    #     to the breathing room you want to give to the backend.
     call save_backend_request;
     counters.counter("beresp-5xx", 1, varnishstat=true);
     if (!bereq.uncacheable) {

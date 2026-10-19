@@ -270,6 +270,15 @@ sub vcl_backend_response {
             #
             #   - Avoid to stop execution here (i.e., 'return (deliver)').
             #     Additional steps are pending (e.g., Ykey, etc.).
+            #
+            #   - HFM as an alternative to the short TTL: trying to create a HFM
+            #     object here (i.e., using a 0s TTL or setting
+            #     'beresp.uncacheable') would avoid serialization and recover
+            #     faster (the first cacheable response replaces it), but request
+            #     coalescing would be lost during that time: every request would
+            #     hit the failing backend. Adjust TTL & grace according to the
+            #     breathing room you want to give to the backend, but always use
+            #     a regular object to preserve request coalescing.
             call save_backend_request;
             if (!bereq.uncacheable) {
                 set beresp.ttl = 10s;
