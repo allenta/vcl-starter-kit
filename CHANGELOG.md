@@ -3,6 +3,7 @@
     + Upgrade to Go 1.27.1.
     + Sync with built-in VCL changes in Varnish Enterprise 6.0.18r5.
     + Document why HFM objects are not used after failed calls to `save_backend_request`.
+    + `std.tolower()` replaced with `.lower()` available since Varnish Enterprise 6.0.18r7.
 
 - 2026.08.0 (2026-08-24):
     + Add proposal of a Go-based end-to-end testing skeleton.

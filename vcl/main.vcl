@@ -389,7 +389,7 @@ sub vcl_recv {
     # Execute several one-time normalizations & initializations.
     if (req.restarts == 0) {
         # Normalize host header converting to lowercase.
-        set req.http.Host = std.tolower(req.http.Host);
+        set req.http.Host = req.http.Host.lower();
 
         # Normalize host header dropping port number.
         if (req.http.Host ~ ":\d+$") {
